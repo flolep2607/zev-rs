@@ -902,6 +902,185 @@ __device__ void attn_mma_body(const bf16* q, const bf16* kn, const bf16* vn, bf1
         }
     }
 }
+// ---------------------------------------------------------------------------------------------------------------
+// attn_mma_body with FlashAttention-2's memory plan: Q fragments in registers (staged once through the K/V buffers),
+// so shared memory is one K and one V tile (2 x BK x (HD + 8) bf16, 33.8 KB at HD 256, against 67.6 KB): two blocks per
+// SM instead of one; and the tiles arrive by cp.async, the next K while P V runs and the next V while Q K^T runs. Same
+// arithmetic in the same order as attn_mma_body.
+// ---------------------------------------------------------------------------------------------------------------
+template <int HD>
+__device__ void attn_fa_body(const bf16* q, const bf16* kn, const bf16* vn, bf16* out, const bf16* gate, int gld, int gs, const u32* tiles,
+                              const u32* cu, const u32* plen, const u64* rk, const u64* rv, long kvoff, int nh, int nkv, float scale,
+                              float softcap, int window) {
+    constexpr int BQ = 64, BK = 32, LD = HD + 8, NB = HD / 8;
+    extern __shared__ __align__(16) unsigned char smraw[];
+    bf16* Ks = (bf16*)smraw;  // [BK][LD]; Q is staged in Ks + Vs first (BQ * LD == 2 * BK * LD), then lives in registers
+    bf16* Vs = Ks + BK * LD;
+    bf16* Qs = Ks;
+    const int tile = blockIdx.x, h = blockIdx.y, g = h / (nh / nkv);
+    const int b = tiles[2 * tile], q0 = tiles[2 * tile + 1];
+    const int start = cu[b], n = cu[b + 1] - start, P = plen[b];
+    const int tid = threadIdx.x, w = tid >> 5, lane = tid & 31, gid = lane >> 2, tig = lane & 3;
+    const long kvw = (long)nkv * HD;
+    const bf16* pk = P ? (const bf16*)rk[b] + (long)P * kvoff : nullptr;
+    const bf16* pv = P ? (const bf16*)rv[b] + (long)P * kvoff : nullptr;
+    constexpr int CH = HD / 8;  // 16-byte chunks per row
+    for (int e = tid; e < BQ * CH; e += 128) {
+        const int r = e / CH, c = e % CH;
+        uint4 x = make_uint4(0, 0, 0, 0);
+        if (q0 + r < n) x = *(const uint4*)(q + ((long)(start + q0 + r) * nh + h) * HD + 8 * c);
+        *(uint4*)(Qs + r * LD + 8 * c) = x;
+    }
+    __syncthreads();
+    unsigned qf[HD / 16][4];
+#pragma unroll
+    for (int kc = 0; kc < HD / 16; kc++) ldsm4(qf[kc], Qs + (16 * (tid >> 5) + (lane & 15)) * LD + 16 * kc + 8 * (lane >> 4));
+    __syncthreads();
+    float o[NB][4];
+#pragma unroll
+    for (int i = 0; i < NB; i++) o[i][0] = o[i][1] = o[i][2] = o[i][3] = 0.f;
+    float m0 = NEG_INF, m1 = NEG_INF, l0 = 0.f, l1 = 0.f;
+    const int qa = q0 + 16 * w + gid, qb = qa + 8;  // this thread's two query rows
+    const int pa = P + min(qa, n - 1), pb = P + min(qb, n - 1);
+    const int qlast = min(q0 + BQ, n) - 1;
+    const int kend = P + qlast + 1;
+    int kbeg = 0;
+    if (window > 0) {
+        kbeg = max(0, P + q0 - window + 1);
+        kbeg -= kbeg % BK;
+    }
+    const bool warp_live = q0 + 16 * w < n;
+    // K and V tiles through cp.async, FlashAttention-2's order: the next K loads during P V, the next V during Q K^T.
+    auto load = [&](bf16* dst, int which, int k0) {
+        for (int e = tid; e < BK * CH; e += 128) {
+            const int r = e / CH, c = e % CH, j = k0 + r;
+            const bool ok = j < kend;
+            const bf16* src = !ok ? kn
+                              : which == 0 ? (j < P ? pk + (long)j * kvw : kn + (long)(start + j - P) * kvw) + (long)g * HD + 8 * c
+                                           : (j < P ? pv + (long)j * kvw : vn + (long)(start + j - P) * kvw) + (long)g * HD + 8 * c;
+            asm volatile("cp.async.cg.shared.global [%0], [%1], 16, %2;" ::"r"((unsigned)__cvta_generic_to_shared(dst + r * LD + 8 * c)),
+                         "l"(src), "r"(ok ? 16 : 0));  // 0 source bytes: zero fill past the end
+        }
+        asm volatile("cp.async.commit_group;");
+    };
+    if (kbeg < kend) {
+        load(Ks, 0, kbeg);
+        load(Vs, 1, kbeg);
+    }
+    for (int k0 = kbeg; k0 < kend; k0 += BK) {
+        asm volatile("cp.async.wait_group 1;");  // K of this tile (its V may still be in flight)
+        __syncthreads();
+        unsigned pa_[2][4];
+        if (warp_live) {
+        float s[4][4];
+#pragma unroll
+        for (int i = 0; i < 4; i++) s[i][0] = s[i][1] = s[i][2] = s[i][3] = 0.f;
+#pragma unroll
+        for (int kc = 0; kc < HD / 16; kc++) {
+            const unsigned* a = qf[kc];
+#pragma unroll
+            for (int nb = 0; nb < 4; nb += 2) {
+                unsigned bb[4];
+                ldsm4(bb, Ks + (8 * nb + (lane & 7) + 8 * (lane >> 4)) * LD + 16 * kc + 8 * ((lane >> 3) & 1));
+                mma16816(s[nb], a, bb[0], bb[1]);
+                mma16816(s[nb + 1], a, bb[2], bb[3]);
+            }
+        }
+        float mx0 = NEG_INF, mx1 = NEG_INF;
+#pragma unroll
+        for (int nb = 0; nb < 4; nb++) {
+#pragma unroll
+            for (int e = 0; e < 4; e++) {
+                const int j = k0 + 8 * nb + 2 * tig + (e & 1);
+                const int qp = e < 2 ? pa : pb;
+                const bool ok = j <= qp && j < kend && (window <= 0 || qp - j < window);
+                float x = s[nb][e] * scale;
+                if (softcap > 0.f) x = softcap * tanhf(x / softcap);
+                x = ok ? x : NEG_INF;
+                s[nb][e] = x;
+                if (e < 2) mx0 = fmaxf(mx0, x);
+                else mx1 = fmaxf(mx1, x);
+            }
+        }
+        mx0 = fmaxf(mx0, __shfl_xor_sync(FULL, mx0, 1));
+        mx0 = fmaxf(mx0, __shfl_xor_sync(FULL, mx0, 2));
+        mx1 = fmaxf(mx1, __shfl_xor_sync(FULL, mx1, 1));
+        mx1 = fmaxf(mx1, __shfl_xor_sync(FULL, mx1, 2));
+        const float n0 = fmaxf(m0, mx0), n1 = fmaxf(m1, mx1);
+        const float al0 = n0 == NEG_INF ? 1.f : expf(m0 - n0), al1 = n1 == NEG_INF ? 1.f : expf(m1 - n1);
+        m0 = n0;
+        m1 = n1;
+        l0 *= al0;
+        l1 *= al1;
+#pragma unroll
+        for (int i = 0; i < NB; i++) {
+            o[i][0] *= al0;
+            o[i][1] *= al0;
+            o[i][2] *= al1;
+            o[i][3] *= al1;
+        }
+#pragma unroll
+        for (int nb = 0; nb < 4; nb++) {
+            float p[4];
+#pragma unroll
+            for (int e = 0; e < 4; e++) {
+                const float mm = e < 2 ? n0 : n1;
+                p[e] = s[nb][e] == NEG_INF ? 0.f : expf(s[nb][e] - mm);
+            }
+            l0 += p[0] + p[1];
+            l1 += p[2] + p[3];
+            const int kc = nb >> 1, hi = nb & 1;
+            pa_[kc][2 * hi] = pack_bf16(p[0], p[1]);
+            pa_[kc][2 * hi + 1] = pack_bf16(p[2], p[3]);
+        }
+        }
+        __syncthreads();  // every warp is done with Ks
+        if (k0 + BK < kend) load(Ks, 0, k0 + BK);
+        else asm volatile("cp.async.commit_group;");  // keep one group per step for the waits
+        asm volatile("cp.async.wait_group 1;");  // V of this tile
+        __syncthreads();
+        if (warp_live) {
+#pragma unroll
+        for (int kc = 0; kc < 2; kc++) {
+#pragma unroll
+            for (int nb = 0; nb < NB; nb += 2) {
+                unsigned bb[4];
+                ldsm4t(bb, Vs + (16 * kc + (lane & 15)) * LD + 8 * nb + 8 * (lane >> 4));
+                mma16816(o[nb], pa_[kc], bb[0], bb[1]);
+                mma16816(o[nb + 1], pa_[kc], bb[2], bb[3]);
+            }
+        }
+        }
+        __syncthreads();  // every warp is done with Vs
+        if (k0 + BK < kend) load(Vs, 1, k0 + BK);
+        else asm volatile("cp.async.commit_group;");
+    }
+    if (!warp_live) return;
+    l0 += __shfl_xor_sync(FULL, l0, 1);
+    l0 += __shfl_xor_sync(FULL, l0, 2);
+    l1 += __shfl_xor_sync(FULL, l1, 1);
+    l1 += __shfl_xor_sync(FULL, l1, 2);
+#pragma unroll
+    for (int half = 0; half < 2; half++) {
+        const int qi = half ? qb : qa;
+        if (qi >= n) continue;
+        const float z = half ? l1 : l0;
+        const long tok = start + qi;
+#pragma unroll
+        for (int nb = 0; nb < NB; nb++) {
+#pragma unroll
+            for (int e = 0; e < 2; e++) {
+                const int d = 8 * nb + 2 * tig + e;
+                float v = o[nb][2 * half + e] / z;
+                if (gate) {
+                    const float gv = bf2f(gate[tok * gld + (long)h * gs + d]);
+                    v = rnd<bf16>(v) * (1.f / (1.f + expf(-gv)));
+                }
+                out[(tok * nh + h) * HD + d] = f2bf(v);
+            }
+        }
+    }
+}
 #define ATTN_MMA_ARGS                                                                                                                     \
     const bf16 *q, const bf16 *kn, const bf16 *vn, bf16 *out, const bf16 *gate, int gld, int gs, const u32 *tiles, const u32 *cu, \
         const u32 *plen, const u64 *rk, const u64 *rv, long kvoff, int nh, int nkv, float scale, float softcap, int window
@@ -909,6 +1088,10 @@ __device__ void attn_mma_body(const bf16* q, const bf16* kn, const bf16* vn, bf1
 extern "C" __global__ void __launch_bounds__(128) attn_mma64(ATTN_MMA_ARGS) { ATTN_MMA_CALL(64); }
 extern "C" __global__ void __launch_bounds__(128) attn_mma128(ATTN_MMA_ARGS) { ATTN_MMA_CALL(128); }
 extern "C" __global__ void __launch_bounds__(128) attn_mma256(ATTN_MMA_ARGS) { ATTN_MMA_CALL(256); }
+#define ATTN_FA_CALL(HD) attn_fa_body<HD>(q, kn, vn, out, gate, gld, gs, tiles, cu, plen, rk, rv, kvoff, nh, nkv, scale, softcap, window)
+extern "C" __global__ void __launch_bounds__(128) attn_fa64(ATTN_MMA_ARGS) { ATTN_FA_CALL(64); }
+extern "C" __global__ void __launch_bounds__(128) attn_fa128(ATTN_MMA_ARGS) { ATTN_FA_CALL(128); }
+extern "C" __global__ void __launch_bounds__(128) attn_fa256(ATTN_MMA_ARGS) { ATTN_FA_CALL(256); }
 
 
 // ---------------------------------------------------------------------------------------------------------------

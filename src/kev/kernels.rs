@@ -1340,7 +1340,8 @@ mod cu {
         let name = match (hd, mma, sfx(dt)?) {
             (64, true, _) => "attn_mma64",
             (128, true, _) => "attn_mma128",
-            (256, true, _) => "attn_mma256",
+            // attn_fa256: Q in registers + cp.async K/V, 2.86x attn_mma256 at Kev-4B's shape (csrc/attn_bench.cu)
+            (256, true, _) => "attn_fa256",
             (64, _, "bf16") => "attn64_bf16",
             (64, _, _) => "attn64_f32",
             (128, _, "bf16") => "attn128_bf16",
@@ -1351,7 +1352,9 @@ mod cu {
             (512, _, _) => "attn512_f32",
             _ => candle_core::bail!("attention: head_dim {hd} unsupported"),
         };
-        let (smem, tiles, o_tiles) = if mma {
+        let (smem, tiles, o_tiles) = if mma && hd == 256 {
+            ((64 * (hd + 8) * 2) as u32, &pack.tiles64, m.o_tiles64) // attn_fa: one K and one V tile
+        } else if mma {
             ((128 * (hd + 8) * 2) as u32, &pack.tiles64, m.o_tiles64)
         } else {
             (((BQ + 32) * hd * 4) as u32, &pack.tiles, m.o_tiles)
