@@ -1057,7 +1057,7 @@ mod cu {
             unreachable!()
         };
         let f = func(d, name)?;
-        if name == "gdn_fast_bf16" {
+        if name == "gdn_fast_bf16" || name == "gdn_chunk_bf16" {
             // all of L1 as shared memory: 6 blocks x 14.7 KB is what gives it 24 warps per SM
             f.set_attribute(
                 candle_core::cuda_backend::cudarc::driver::sys::CUfunction_attribute::CU_FUNC_ATTRIBUTE_PREFERRED_SHARED_MEMORY_CARVEOUT,
@@ -1436,6 +1436,35 @@ mod cu {
             ],
         )?;
         let (o, po) = out(p, &[n, g.hv * DV], DType::F32)?;
+        static RECURRENT: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        if !*RECURRENT.get_or_init(|| std::env::var("KEV_GDN_RECURRENT").is_ok_and(|v| v == "1")) {
+            for (list, off) in [(&pack.tier0, m.o_t0), (&pack.tier1, m.o_t1)] {
+                launch(
+                    p,
+                    "gdn_chunk_bf16",
+                    (g.hv as u32, list.len() as u32, 1),
+                    256,
+                    0,
+                    &[
+                        A::P(pq),
+                        A::P(pk),
+                        A::P(pv),
+                        A::I((g.hv * DV) as i32),
+                        A::P(pg),
+                        A::P(po),
+                        A::P(m.u(m.o_cu)?),
+                        A::P(m.u(off)?),
+                        A::P(m.p(1)?),
+                        A::P(m.p(5)?),
+                        A::I(g.hk as i32),
+                        A::I(g.hv as i32),
+                        A::I(lg as i32),
+                    ],
+                )?;
+            }
+            drop((qn, kn, vo, gate));
+            return Ok(o);
+        }
         for (list, off) in [(&pack.tier0, m.o_t0), (&pack.tier1, m.o_t1)] {
             launch(
                 p,
