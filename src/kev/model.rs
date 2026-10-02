@@ -79,6 +79,15 @@ pub enum Proj {
         out: usize,
         inn: usize,
     },
+    /// KEV_W8: 8-bit weights [out, in] with one f32 scale per output channel; activations are quantized per token
+    /// on each use (kernels::quant_rows, kernels::gemm_w8). mode 0 = e4m3, 1 = int8, 2 = e4m3 with one scale per tensor.
+    W8 {
+        q: Tensor,
+        s: Tensor,
+        out: usize,
+        inn: usize,
+        mode: i32,
+    },
 }
 
 impl Proj {
@@ -95,7 +104,29 @@ impl Proj {
             Proj::Q8 { qs, d, out, inn } => {
                 x.matmul(&kernels::dequant_q8(qs, d, *out, *inn, x.dtype())?.t()?)
             }
+            Proj::W8 { q, s, out, inn, mode } => {
+                let m = x.elem_count() / inn;
+                let mut dims = x.dims().to_vec();
+                *dims.last_mut().unwrap() = *out;
+                if m == 0 {
+                    return Tensor::zeros(dims, x.dtype(), x.device());
+                }
+                let (xq, sx) = kernels::quant_rows(&x.reshape((m, *inn))?, *mode)?;
+                kernels::gemm_w8(&xq, &sx, q, s, m, *out, *inn, *mode)?.reshape(dims)
+            }
         }
+    }
+    /// Re-encode a dense bf16 projection as W8 in place. Shapes cuBLASLt's 8-bit kernels cannot take (dims not
+    /// multiples of 16) stay dense. Returns whether it converted.
+    fn to_w8(&mut self, mode: i32) -> Result<bool> {
+        let Proj::Dense(w) = self else { return Ok(false) };
+        let (out, inn) = w.dims2()?;
+        if w.dtype() != DType::BF16 || out % 16 != 0 || inn % 16 != 0 {
+            return Ok(false);
+        }
+        let (q, s) = kernels::quant_rows(w, mode)?;
+        *self = Proj::W8 { q, s, out, inn, mode };
+        Ok(true)
     }
     /// Rows `ids` of the weight in `dt` (an embedding lookup, label rows).
     pub fn rows_at(&self, ids: &[u32], dt: DType) -> Result<Tensor> {
@@ -104,12 +135,14 @@ impl Proj {
                 .index_select(&Tensor::new(ids, w.device())?, 0)?
                 .to_dtype(dt),
             Proj::Q8 { qs, d, inn, .. } => kernels::gather_q8(qs, d, ids, *inn, dt),
+            Proj::W8 { .. } => candle_core::bail!("rows of a W8 projection: embeddings and heads stay dense"),
         }
     }
     pub fn rows(&self) -> usize {
         match self {
             Proj::Dense(w) => w.dim(0).unwrap_or(0),
             Proj::Q8 { out, .. } => *out,
+            Proj::W8 { out, .. } => *out,
         }
     }
     fn cat(ps: Vec<Proj>) -> Result<Proj> {
@@ -559,7 +592,7 @@ impl Model {
             .unwrap_or("")
             .to_string();
         let ld = Loader::new(base_dir, lora_dir, dt, dev)?;
-        let m = match mt.as_str() {
+        let mut m = match mt.as_str() {
             "qwen3_5_text" | "qwen3_5" => Self::qwen35(&ld, &cfg, &full)?,
             "qwen3" => Self::dense(&ld, &cfg, &full, Family::Qwen3)?,
             "gemma3_text" | "gemma3" => Self::dense(&ld, &cfg, &full, Family::Gemma3)?,
@@ -569,6 +602,22 @@ impl Model {
             other => candle_core::bail!("unsupported model_type {other:?}"),
         };
         let merged = ld.finish()?;
+        if let Some(mode) = kernels::w8_mode() {
+            if dt != DType::BF16 {
+                candle_core::bail!("KEV_W8 needs --dtype bf16");
+            }
+            let (mut done, mut kept) = (0, 0);
+            for l in &mut m.layers {
+                let projs: Vec<&mut Proj> = match &mut l.mixer {
+                    Mixer::Gdn(g) => vec![&mut g.proj, &mut g.out, &mut l.gate_up, &mut l.down],
+                    Mixer::Attn(a) => vec![&mut a.qkv, &mut a.o, &mut l.gate_up, &mut l.down],
+                };
+                for p in projs {
+                    if p.to_w8(mode)? { done += 1 } else { kept += 1 }
+                }
+            }
+            eprintln!("kev: KEV_W8={} on {done} projections ({kept} kept bf16)", ["fp8", "int8", "fp8t"][mode as usize]);
+        }
         eprintln!(
             "kev: {} backbone, {} layers, hidden {}, dtype {dt:?}, merged {merged} LoRA pairs",
             m.model_type,

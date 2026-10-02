@@ -1163,3 +1163,124 @@ extern "C" __global__ void __launch_bounds__(256) gemm_q8_big(const int* xq, con
                 if (rr < M && cc < N) out[(long)rr * N + cc] = acc[mi][ni][e];
             }
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// W8A8 projections (KEV_W8): fp8 and int8 quantize weights per output channel and activations per token, each to 8
+// bits with an f32 scale (amax / 448 for e4m3, amax / 127 for int8); cuBLASLt multiplies the 8-bit operands with f32
+// (fp8) or i32 (int8) accumulation, and rescale_* applies sx[m] * sw[n] (Ada's cuBLASLt has no per-row/per-column
+// scale epilogue). fp8t uses one scale per tensor, which cuBLASLt applies itself: no rescale pass.
+
+// float -> e4m3fn, round to nearest even, saturating at 448 (no NaN out). In software: NVRTC targets sm_80 here and
+// the hardware cvt needs sm_89.
+__device__ __forceinline__ unsigned char f2e4m3(float x) {
+    const unsigned s = (__float_as_uint(x) >> 24) & 0x80u;
+    const float a = fminf(fabsf(x), 448.f);
+    if (!(a >= 0x1p-6f)) {                              // subnormal (and 0, NaN): m * 2^-9; m == 8 is the first normal
+        return (unsigned char)(s | (unsigned)__float2int_rn(a * 512.f));
+    }
+    int e;
+    const float f = frexpf(a, &e);                      // a = f * 2^e, f in [0.5, 1)
+    int E = e + 6, m = __float2int_rn((f * 2.f - 1.f) * 8.f);
+    if (m == 8) { m = 0; E += 1; }
+    if (E > 15 || (E == 15 && m > 6)) { E = 15; m = 6; }
+    return (unsigned char)(s | (E << 3) | m);
+}
+
+// 8 bf16 (one 16-byte load) -> floats.
+__device__ __forceinline__ void ld8(const bf16* p, float* f) {
+    const uint4 v = *reinterpret_cast<const uint4*>(p);
+    const unsigned w[4] = {v.x, v.y, v.z, v.w};
+    for (int j = 0; j < 4; j++) { f[2 * j] = __uint_as_float(w[j] << 16); f[2 * j + 1] = __uint_as_float(w[j] & 0xffff0000u); }
+}
+__device__ __forceinline__ void st8(bf16* p, const float* f) {
+    uint4 v;
+    unsigned* w = reinterpret_cast<unsigned*>(&v);
+    for (int j = 0; j < 4; j++) w[j] = (unsigned)f2bf(f[2 * j]) | ((unsigned)f2bf(f[2 * j + 1]) << 16);
+    *reinterpret_cast<uint4*>(p) = v;
+}
+__device__ __forceinline__ unsigned char q8(float v, int mode) {
+    return mode == 1 ? (unsigned char)(signed char)max(-127, min(127, __float2int_rn(v))) : f2e4m3(v);
+}
+__device__ __forceinline__ float block_max(float v, float* sh) {
+    v = warp_max(v);
+    if ((threadIdx.x & 31) == 0) sh[threadIdx.x >> 5] = v;
+    __syncthreads();
+    v = threadIdx.x < (blockDim.x >> 5) ? sh[threadIdx.x] : 0.f;
+    if (threadIdx.x < 32) v = warp_max(v);
+    if (threadIdx.x == 0) sh[0] = v;
+    __syncthreads();
+    v = sh[0];
+    __syncthreads();
+    return v;
+}
+
+// One block per row of x [R, K] (K % 8 == 0): q [R, K] 8-bit, s [R] f32 = amax / qmax. mode 1 = int8, else e4m3.
+// With `amax` non-null the row's own max is replaced by *amax (one scale for the whole tensor, mode fp8t).
+extern "C" __global__ void __launch_bounds__(256) quant_rows_bf16(const bf16* x, unsigned char* q, float* s, int K, int mode, const float* amax_in) {
+    const long r = blockIdx.x;
+    const bf16* xr = x + r * K;
+    __shared__ float sh[8];
+    float f[8], amax;
+    if (amax_in) {
+        amax = *amax_in;
+    } else {
+        amax = 0.f;
+        for (int i = threadIdx.x * 8; i < K; i += blockDim.x * 8) {
+            ld8(xr + i, f);
+            for (int j = 0; j < 8; j++) amax = fmaxf(amax, fabsf(f[j]));
+        }
+        amax = block_max(amax, sh);
+    }
+    const float sc = amax > 0.f ? amax / (mode == 1 ? 127.f : 448.f) : 1.f, inv = 1.f / sc;
+    if (threadIdx.x == 0) s[r] = sc;
+    unsigned char* qr = q + r * K;
+    for (int i = threadIdx.x * 8; i < K; i += blockDim.x * 8) {
+        ld8(xr + i, f);
+        uint2 o;
+        unsigned char* b = reinterpret_cast<unsigned char*>(&o);
+        for (int j = 0; j < 8; j++) b[j] = q8(f[j] * inv, mode);
+        *reinterpret_cast<uint2*>(qr + i) = o;
+    }
+}
+
+// The max |x| over a whole bf16 tensor into *out (zeroed by the caller); n % 8 == 0. Non-negative floats order as
+// their bits, so an integer atomicMax is exact.
+extern "C" __global__ void __launch_bounds__(256) amax_bf16(const bf16* x, long n, float* out) {
+    __shared__ float sh[8];
+    float f[8], m = 0.f;
+    for (long i = (blockIdx.x * (long)blockDim.x + threadIdx.x) * 8; i < n; i += (long)gridDim.x * blockDim.x * 8) {
+        ld8(x + i, f);
+        for (int j = 0; j < 8; j++) m = fmaxf(m, fabsf(f[j]));
+    }
+    m = block_max(m, sh);
+    if (threadIdx.x == 0) atomicMax(reinterpret_cast<int*>(out), __float_as_int(m));
+}
+
+// One block per row m of y [M, N] bf16 in place (the fp8 GEMM's unit-scale output): y *= sx[m] * sw[n]; N % 8 == 0.
+extern "C" __global__ void __launch_bounds__(256) rescale_bf16(bf16* y, const float* sx, const float* sw, long total, int N) {
+    bf16* yr = y + blockIdx.x * (long)N;
+    const float a = sx[blockIdx.x];
+    float f[8];
+    for (int i = threadIdx.x * 8; i < N; i += blockDim.x * 8) {
+        ld8(yr + i, f);
+        const float4 w0 = *reinterpret_cast<const float4*>(sw + i), w1 = *reinterpret_cast<const float4*>(sw + i + 4);
+        f[0] *= a * w0.x; f[1] *= a * w0.y; f[2] *= a * w0.z; f[3] *= a * w0.w;
+        f[4] *= a * w1.x; f[5] *= a * w1.y; f[6] *= a * w1.z; f[7] *= a * w1.w;
+        st8(yr + i, f);
+    }
+}
+
+// One block per row m of acc [M, N] i32 (the int8 GEMM) -> y bf16 = acc * sx[m] * sw[n]; N % 8 == 0.
+extern "C" __global__ void __launch_bounds__(256) rescale_i32(const int* acc, const float* sx, const float* sw, bf16* y, long total, int N) {
+    const int* ar = acc + blockIdx.x * (long)N;
+    bf16* yr = y + blockIdx.x * (long)N;
+    const float a = sx[blockIdx.x];
+    float f[8];
+    for (int i = threadIdx.x * 8; i < N; i += blockDim.x * 8) {
+        const int4 v0 = *reinterpret_cast<const int4*>(ar + i), v1 = *reinterpret_cast<const int4*>(ar + i + 4);
+        const float4 w0 = *reinterpret_cast<const float4*>(sw + i), w1 = *reinterpret_cast<const float4*>(sw + i + 4);
+        f[0] = v0.x * a * w0.x; f[1] = v0.y * a * w0.y; f[2] = v0.z * a * w0.z; f[3] = v0.w * a * w0.w;
+        f[4] = v1.x * a * w1.x; f[5] = v1.y * a * w1.y; f[6] = v1.z * a * w1.z; f[7] = v1.w * a * w1.w;
+        st8(yr + i, f);
+    }
+}

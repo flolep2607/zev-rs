@@ -817,6 +817,39 @@ fn rounder(dt: DType) -> fn(f32) -> f32 {
     }
 }
 
+/// KEV_W8 quantizes the layer projections to 8 bits (W8A8): "fp8" (e4m3, per channel and per token; Ada and later),
+/// "fp8t" (e4m3, one scale per tensor) or "int8" (per channel and per token; Turing and later).
+pub fn w8_mode() -> Option<i32> {
+    match std::env::var("KEV_W8").ok()?.as_str() {
+        "fp8" => Some(0),
+        "int8" => Some(1),
+        "fp8t" => Some(2),
+        _ => None,
+    }
+}
+
+/// x [R, K] bf16 -> (q [R, K] 8-bit, s [R] f32), one symmetric scale per row (mode 0 e4m3, 1 int8), or the one
+/// tensor-wide scale repeated in every row (mode 2, e4m3).
+pub fn quant_rows(x: &Tensor, mode: i32) -> Result<(Tensor, Tensor)> {
+    #[cfg(feature = "cuda")]
+    if is_cuda(x) {
+        return cu::quant_rows(x, mode);
+    }
+    let _ = (x, mode);
+    candle_core::bail!("KEV_W8 needs a CUDA device")
+}
+
+/// x [M, K] times w [N, K]^T, both from quant_rows (scales sx [M], sw [N]) -> y [M, N] bf16.
+#[allow(clippy::too_many_arguments)]
+pub fn gemm_w8(xq: &Tensor, sx: &Tensor, wq: &Tensor, sw: &Tensor, m: usize, n: usize, k: usize, mode: i32) -> Result<Tensor> {
+    #[cfg(feature = "cuda")]
+    if is_cuda(xq) {
+        return cu::gemm_w8(xq, sx, wq, sw, m, n, k, mode);
+    }
+    let _ = (xq, sx, wq, sw, m, n, k, mode);
+    candle_core::bail!("KEV_W8 needs a CUDA device")
+}
+
 /// Serving setup for a CUDA device: keep freed memory in the stream-ordered pool across synchronisations (the
 /// default release threshold of 0 hands it back to the driver at every sync, so each pass re-mapped all of its
 /// activations), and stop recording two CUDA events per allocation (candle runs everything on one stream).
@@ -910,6 +943,8 @@ mod cu {
             DType::BF16 => {
                 CudaStorage::wrap_cuda_slice(unsafe { d.alloc::<half::bf16>(n1)? }, d.clone())
             }
+            DType::U8 => CudaStorage::wrap_cuda_slice(unsafe { d.alloc::<u8>(n1)? }, d.clone()),
+            DType::U32 => CudaStorage::wrap_cuda_slice(unsafe { d.alloc::<u32>(n1)? }, d.clone()),
             d => candle_core::bail!("kev: cannot allocate {d:?}"),
         };
         Tensor::from_storage(
@@ -1550,6 +1585,154 @@ mod cu {
             ],
         )?;
         Ok(o)
+    }
+
+    /// One cuBLASLt handle and workspace per device, for the W8A8 projections.
+    fn lt_handle(d: &CudaDevice) -> Result<(usize, u64, usize)> {
+        use candle_core::cuda_backend::cudarc::cublaslt::result as lt;
+        type Handles = HashMap<candle_core::cuda_backend::DeviceId, (usize, candle_core::cuda_backend::cudarc::driver::CudaSlice<u8>)>;
+        static LT: std::sync::OnceLock<Mutex<Handles>> = std::sync::OnceLock::new();
+        const WS: usize = 32 << 20;
+        let mut g = LT.get_or_init(|| Mutex::new(HashMap::new())).lock().unwrap();
+        if !g.contains_key(&d.id()) {
+            let h = lt::create_handle().map_err(candle_core::Error::wrap)? as usize;
+            let ws = d.cuda_stream().alloc_zeros::<u8>(WS).w()?;
+            g.insert(d.id(), (h, ws));
+        }
+        let (h, ws) = &g[&d.id()];
+        let (p, _sync) = ws.device_ptr(ws.stream());
+        let r = (*h, p, WS);
+        Ok(r)
+    }
+
+    pub fn quant_rows(x: &Tensor, mode: i32) -> Result<(Tensor, Tensor)> {
+        let x = x.contiguous()?;
+        let (r, k) = x.dims2()?;
+        let (q, qp) = out(&x, &[r, k], DType::U8)?;
+        let (s, sp) = out(&x, &[r], DType::F32)?;
+        let amax = if mode == 2 {
+            let n = (r * k) as i64;
+            let m = Tensor::zeros(1, DType::F32, x.device())?;
+            let grid = ((n + 2047) / 2048).min(1024) as u32;
+            launch(&x, "amax_bf16", (grid, 1, 1), 256, 0, &[A::P(ptr(&x)?), A::L(n), A::P(ptr(&m)?)])?;
+            Some(m)
+        } else {
+            None
+        };
+        launch(
+            &x,
+            "quant_rows_bf16",
+            (r as u32, 1, 1),
+            256,
+            0,
+            &[A::P(ptr(&x)?), A::P(qp), A::P(sp), A::I(k as i32), A::I(mode), A::P(opt(amax.as_ref())?)],
+        )?;
+        Ok((q, s))
+    }
+
+    /// y [M, N] = x [M, K] w [N, K]^T in cuBLASLt's column-major terms: D [N, M] = op_T(W as [K, N]) * (X as [K, M]).
+    #[allow(clippy::too_many_arguments)]
+    pub fn gemm_w8(xq: &Tensor, sx: &Tensor, wq: &Tensor, sw: &Tensor, m: usize, n: usize, k: usize, mode: i32) -> Result<Tensor> {
+        use candle_core::cuda_backend::cudarc::cublaslt::{result as lt, sys};
+        use std::ffi::c_void;
+        let candle_core::Device::Cuda(d) = xq.device() else {
+            unreachable!()
+        };
+        let e = candle_core::Error::wrap;
+        let (h, ws, ws_size) = lt_handle(d)?;
+        let h = h as sys::cublasLtHandle_t;
+        let (t8, td, compute, scale) = if mode != 1 {
+            (sys::cudaDataType::CUDA_R_8F_E4M3, sys::cudaDataType::CUDA_R_16BF, sys::cublasComputeType_t::CUBLAS_COMPUTE_32F, sys::cudaDataType::CUDA_R_32F)
+        } else {
+            (sys::cudaDataType::CUDA_R_8I, sys::cudaDataType::CUDA_R_32I, sys::cublasComputeType_t::CUBLAS_COMPUTE_32I, sys::cudaDataType::CUDA_R_32I)
+        };
+        let (acc, accp) = out(xq, &[m, n], if mode != 1 { DType::BF16 } else { DType::U32 })?;
+        let (one_f, zero_f, one_i, zero_i) = (1f32, 0f32, 1i32, 0i32);
+        let (alpha, beta): (*const c_void, *const c_void) = if mode != 1 {
+            (&one_f as *const f32 as _, &zero_f as *const f32 as _)
+        } else {
+            (&one_i as *const i32 as _, &zero_i as *const i32 as _)
+        };
+        // ponytail: descriptors and the heuristic are rebuilt per call (tens of microseconds against a pass of seconds);
+        // cache them by (m, n, k) if a profile ever shows them.
+        unsafe {
+            let desc = lt::create_matmul_desc(compute, scale).map_err(e)?;
+            let op_t: i32 = 1; // CUBLAS_OP_T, as cudarc's own set_transpose writes it
+            lt::set_matmul_desc_attribute(
+                desc,
+                sys::cublasLtMatmulDescAttributes_t::CUBLASLT_MATMUL_DESC_TRANSA,
+                &op_t as *const _ as *const c_void,
+                std::mem::size_of_val(&op_t),
+            )
+            .map_err(e)?;
+            let set = |attr, v: *const c_void, size| lt::set_matmul_desc_attribute(desc, attr, v, size).map_err(e);
+            if mode != 1 {
+                // Ada fp8 without fast accumulation promotes partial sums to f32 every few k-steps and runs slower;
+                // forward-only inference takes the fast path (as Transformer Engine does).
+                let fast: i8 = 1;
+                set(sys::cublasLtMatmulDescAttributes_t::CUBLASLT_MATMUL_DESC_FAST_ACCUM, &fast as *const i8 as _, 1)?;
+            }
+            let (swp, sxp) = (ptr(sw)?, ptr(sx)?);
+            if mode == 2 {
+                // one scale per tensor, in element 0 of the per-row scale vectors: cuBLASLt applies it, no rescale
+                set(sys::cublasLtMatmulDescAttributes_t::CUBLASLT_MATMUL_DESC_A_SCALE_POINTER, &swp as *const u64 as _, 8)?;
+                set(sys::cublasLtMatmulDescAttributes_t::CUBLASLT_MATMUL_DESC_B_SCALE_POINTER, &sxp as *const u64 as _, 8)?;
+            }
+            let a = lt::create_matrix_layout(t8, k as u64, n as u64, k as i64).map_err(e)?;
+            let b = lt::create_matrix_layout(t8, k as u64, m as u64, k as i64).map_err(e)?;
+            let c = lt::create_matrix_layout(td, n as u64, m as u64, n as i64).map_err(e)?;
+            let pref = lt::create_matmul_pref().map_err(e)?;
+            let wsz = ws_size as u64;
+            lt::set_matmul_pref_attribute(
+                pref,
+                sys::cublasLtMatmulPreferenceAttributes_t::CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                &wsz as *const u64 as *const c_void,
+                8,
+            )
+            .map_err(e)?;
+            let (wp, xp) = (ptr(wq)? as *const c_void, ptr(xq)? as *const c_void);
+            let heur = lt::get_matmul_algo_heuristic(h, desc, a, b, c, c, pref);
+            let r = heur.and_then(|heur| {
+                lt::matmul(
+                    h,
+                    desc,
+                    alpha,
+                    beta,
+                    wp,
+                    a,
+                    xp,
+                    b,
+                    accp as *const c_void,
+                    c,
+                    accp as *mut c_void,
+                    c,
+                    &heur.algo,
+                    ws as *mut c_void,
+                    ws_size,
+                    d.cuda_stream().cu_stream() as sys::cudaStream_t,
+                )
+            });
+            let _ = lt::destroy_matmul_pref(pref);
+            let _ = lt::destroy_matrix_layout(c);
+            let _ = lt::destroy_matrix_layout(b);
+            let _ = lt::destroy_matrix_layout(a);
+            let _ = lt::destroy_matmul_desc(desc);
+            r.map_err(|err| candle_core::Error::Msg(format!("cublasLt w8 gemm m={m} n={n} k={k} mode={mode}: {err:?}")))?;
+        }
+        let total = (m * n) as i64;
+        let rows = (m as u32, 1, 1);
+        match mode {
+            2 => Ok(acc),
+            0 => {
+                launch(&acc, "rescale_bf16", rows, 256, 0, &[A::P(accp), A::P(ptr(sx)?), A::P(ptr(sw)?), A::L(total), A::I(n as i32)])?;
+                Ok(acc)
+            }
+            _ => {
+                let (y, yp) = out(xq, &[m, n], DType::BF16)?;
+                launch(&y, "rescale_i32", rows, 256, 0, &[A::P(accp), A::P(ptr(sx)?), A::P(ptr(sw)?), A::P(yp), A::L(total), A::I(n as i32)])?;
+                Ok(y)
+            }
+        }
     }
 
     /// The kernels' PTX, compiled once.
