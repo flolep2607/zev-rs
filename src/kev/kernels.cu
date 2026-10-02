@@ -508,6 +508,145 @@ extern "C" __global__ void gdn_bf16(GDN_ARGS(bf16)) { GDN_CALL; }
 extern "C" __global__ void gdn_f32(GDN_ARGS(float)) { GDN_CALL; }
 
 // ---------------------------------------------------------------------------------------------------------------
+// Gated delta rule, bf16 fast path (gdn_prep_bf16 + gdn_fast_bf16): 2.24x gdn_bf16 on a 4090 at Kev-4B's shapes
+// (csrc/gdn_bench.cu, 20 sequences x 1550 tokens: 12.17 -> 5.42 ms) with the same f32 recurrence. Three changes:
+// the q/k norms and the gates are computed once per token (gdn_bf16 recomputed them in each of a head's 16 warps);
+// the 4 warps of a block share one cp.async-staged copy of q, k, v and the gates, GF_CH tokens at a time, so a head's
+// inputs are read 4x less and the block syncs once per chunk; and a lane owns 32 contiguous keys (gdn_bf16
+// interleaved them) read as float4 from a padded shared layout, a quarter of the shared-memory loads. Lazy decay
+// (state = D * S) measured slower: its per-step division outweighs the 32 multiplies it saves.
+// ---------------------------------------------------------------------------------------------------------------
+#define GF_W 4    // warps per block = value tiles of 8 columns
+#define GF_CH 6   // tokens per staged chunk
+#define GF_SL 36  // floats per key slice in shared memory: 32 + 4 of padding puts the 4 slices on different banks
+
+// One warp per (token, key head): qn = q / |q| / sqrt(DK), kn = k / |k| (f32, as gdn_bf16 computes them); one thread
+// per (token, value head): gate = (decay, beta).
+extern "C" __global__ void gdn_prep_bf16(const bf16* qkv, const bf16* proj, int ld, int a_off, int b_off, const float* a_neg,
+                                         const float* dt_bias, float* qn, float* kn, float* gate, long T, int HK, int HV) {
+    const int C = 2 * HK * DK + HV * DV;
+    const long w = ((long)blockIdx.x * blockDim.x + threadIdx.x) >> 5;
+    const int lane = threadIdx.x & 31;
+    if (w < T * HK) {
+        const long tok = w / HK;
+        const int kh = w % HK;
+        const bf16* row = qkv + tok * C;
+        float q[4], k[4], sq = 0.f, sk = 0.f;
+#pragma unroll
+        for (int r = 0; r < 4; r++) {
+            q[r] = bf2f(row[kh * DK + lane + 32 * r]);
+            k[r] = bf2f(row[HK * DK + kh * DK + lane + 32 * r]);
+            sq += q[r] * q[r];
+            sk += k[r] * k[r];
+        }
+        const float iq = rsqrtf(warp_sum(sq) + 1e-6f) * rsqrtf((float)DK), ik = rsqrtf(warp_sum(sk) + 1e-6f);
+#pragma unroll
+        for (int r = 0; r < 4; r++) {
+            qn[w * DK + lane + 32 * r] = q[r] * iq;
+            kn[w * DK + lane + 32 * r] = k[r] * ik;
+        }
+    }
+    const long g = (long)blockIdx.x * blockDim.x + threadIdx.x;
+    if (g < T * HV) {
+        const long tok = g / HV;
+        const int h = g % HV;
+        const float x = bf2f(proj[tok * ld + a_off + h]) + dt_bias[h];
+        const float sp = fmaxf(x, 0.f) + logf(1.f + expf(-fabsf(x)));
+        gate[2 * g] = expf(sp * a_neg[h]);
+        gate[2 * g + 1] = 1.f / (1.f + expf(-bf2f(proj[tok * ld + b_off + h])));
+    }
+}
+
+__device__ __forceinline__ void cpa16(void* dst, const void* src) {
+    asm volatile("cp.async.cg.shared.global [%0], [%1], 16;" ::"r"((unsigned)__cvta_generic_to_shared(dst)), "l"(src));
+}
+__device__ __forceinline__ void cpa8(void* dst, const void* src) {
+    asm volatile("cp.async.ca.shared.global [%0], [%1], 8;" ::"r"((unsigned)__cvta_generic_to_shared(dst)), "l"(src));
+}
+
+// grid (HV * DV / 8 / GF_W, listed sequences), block 32 * GF_W. Warp w owns value columns [8 tile, 8 tile + 8) of
+// head h; lane = column (lane / 4) x key slice (lane % 4) holding keys 32 ks .. 32 ks + 31. rd / wr as gdn_body.
+extern "C" __global__ void __launch_bounds__(32 * GF_W) gdn_fast_bf16(const bf16* qkv, const float* qn, const float* kn,
+        const float* gate, float* out, const u32* cu, const u32* list, const u64* rd, const u64* wr, int HK, int HV, int lg) {
+    constexpr int TPH = DV / 8 / GF_W;
+    const int h = blockIdx.x / TPH, w = threadIdx.x >> 5, lane = threadIdx.x & 31, tid = threadIdx.x;
+    const int tile = (blockIdx.x % TPH) * GF_W + w, col = lane >> 2, ks = lane & 3, j = tile * 8 + col, kh = h / (HV / HK);
+    const int jb = (blockIdx.x % TPH) * GF_W * 8;
+    const int C = 2 * HK * DK + HV * DV;
+    const u32 b = list[blockIdx.y];
+    const long start = cu[b];
+    const int len = cu[b + 1] - start;
+    __shared__ __align__(16) float qk[2][GF_CH][2][4 * GF_SL];
+    __shared__ __align__(16) bf16 vv[2][GF_CH][GF_W * 8];
+    __shared__ __align__(16) float gg[2][GF_CH][2];
+    float S[32];
+    const long soff = ((long)lg * HV + h) * DK * DV + j;
+    const float* s0 = rd[b] ? (const float*)rd[b] + soff : nullptr;
+#pragma unroll
+    for (int r = 0; r < 32; r++) S[r] = s0 ? s0[(long)(32 * ks + r) * DV] : 0.f;
+    auto stage = [&](int c, int buf) {
+        const int t0 = c * GF_CH, n = min(GF_CH, len - t0);
+        for (int e = tid; e < n * 64; e += 32 * GF_W) {  // q then k: 2 x 32 chunks of 16 bytes per token
+            const int i = e >> 6, part = e & 63, which = part >> 5, c4 = part & 31;
+            cpa16(&qk[buf][i][which][(c4 >> 3) * GF_SL + (c4 & 7) * 4], (which ? kn : qn) + ((start + t0 + i) * HK + kh) * DK + 4 * c4);
+        }
+        for (int e = tid; e < n * GF_W; e += 32 * GF_W) {  // v: the block's 8 GF_W columns, 8 per chunk
+            const int i = e / GF_W, c8 = e % GF_W;
+            cpa16(&vv[buf][i][8 * c8], qkv + (start + t0 + i) * C + 2 * HK * DK + h * DV + jb + 8 * c8);
+        }
+        for (int i = tid; i < n; i += 32 * GF_W) cpa8(&gg[buf][i][0], gate + 2 * ((start + t0 + i) * HV + h));
+        asm volatile("cp.async.commit_group;");
+    };
+    const int chunks = (len + GF_CH - 1) / GF_CH;
+    if (chunks > 0) stage(0, 0);
+    for (int c = 0; c < chunks; c++) {
+        const int buf = c & 1;
+        if (c + 1 < chunks) {
+            stage(c + 1, buf ^ 1);
+            asm volatile("cp.async.wait_group 1;");
+        } else {
+            asm volatile("cp.async.wait_group 0;");
+        }
+        __syncthreads();
+        const int n = min(GF_CH, len - c * GF_CH);
+        for (int i = 0; i < n; i++) {
+            const float4* k4 = reinterpret_cast<const float4*>(&qk[buf][i][1][ks * GF_SL]);
+            const float4* q4 = reinterpret_cast<const float4*>(&qk[buf][i][0][ks * GF_SL]);
+            const float decay = gg[buf][i][0], beta = gg[buf][i][1];
+            const float v = bf2f(vv[buf][i][w * 8 + col]);
+            float m4[4] = {0.f, 0.f, 0.f, 0.f};
+#pragma unroll
+            for (int r = 0; r < 8; r++) {
+                const float4 kk = k4[r];
+                S[4 * r] *= decay; S[4 * r + 1] *= decay; S[4 * r + 2] *= decay; S[4 * r + 3] *= decay;
+                m4[0] += S[4 * r] * kk.x; m4[1] += S[4 * r + 1] * kk.y; m4[2] += S[4 * r + 2] * kk.z; m4[3] += S[4 * r + 3] * kk.w;
+            }
+            float mem = (m4[0] + m4[1]) + (m4[2] + m4[3]);
+            mem += __shfl_xor_sync(FULL, mem, 1);
+            mem += __shfl_xor_sync(FULL, mem, 2);
+            const float delta = (v - mem) * beta;
+            float a4[4] = {0.f, 0.f, 0.f, 0.f};
+#pragma unroll
+            for (int r = 0; r < 8; r++) {
+                const float4 kk = k4[r], qq = q4[r];
+                S[4 * r] += kk.x * delta; S[4 * r + 1] += kk.y * delta; S[4 * r + 2] += kk.z * delta; S[4 * r + 3] += kk.w * delta;
+                a4[0] += S[4 * r] * qq.x; a4[1] += S[4 * r + 1] * qq.y; a4[2] += S[4 * r + 2] * qq.z; a4[3] += S[4 * r + 3] * qq.w;
+            }
+            float acc = (a4[0] + a4[1]) + (a4[2] + a4[3]);
+            acc += __shfl_xor_sync(FULL, acc, 1);
+            acc += __shfl_xor_sync(FULL, acc, 2);
+            if (ks == 0) out[((start + c * GF_CH + i) * HV + h) * DV + j] = acc;
+        }
+        __syncthreads();  // this buffer is restaged two chunks on
+    }
+    if (wr[b]) {
+        float* st = (float*)wr[b] + soff;
+#pragma unroll
+        for (int r = 0; r < 32; r++) st[(long)(32 * ks + r) * DV] = S[r];
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
 // DeltaNet output norm: RMSNorm(o) * w * silu(z), one warp per (token, value head).
 // ---------------------------------------------------------------------------------------------------------------
 template <typename T>
