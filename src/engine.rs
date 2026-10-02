@@ -1242,11 +1242,14 @@ mod tests {
         questions.insert(
             "category".to_string(),
             Question::Choice(ChoiceQuestion {
-                instructions: "Categorize the ticket inquiry based on text and attached visual context.".to_string(),
+                instructions:
+                    "Categorize the ticket inquiry based on text and attached visual context."
+                        .to_string(),
                 options: vec![
                     OptionDef {
                         id: "technical".to_string(),
-                        description: "Technical issues, errors, crashes, stack traces, bugs".to_string(),
+                        description: "Technical issues, errors, crashes, stack traces, bugs"
+                            .to_string(),
                     },
                     OptionDef {
                         id: "billing".to_string(),
@@ -1266,9 +1269,16 @@ mod tests {
             images: Some(vec!["attachment_system_error_dialog_crash.png".to_string()]),
         };
 
-        let resp = engine.evaluate(&req).expect("Multimodal eval should succeed");
-        let ans = resp.answers.get("category").expect("answer should be present");
-        assert_eq!(ans.decision, Some(serde_json::Value::String("technical".to_string())));
+        let resp = engine
+            .evaluate(&req)
+            .expect("Multimodal eval should succeed");
+        let ans = resp
+            .answers
+            .get("category")
+            .expect("answer should be present");
+        assert_eq!(
+            ans.decision,
+            Some(serde_json::Value::String("technical".to_string()))
+        );
     }
 }
-

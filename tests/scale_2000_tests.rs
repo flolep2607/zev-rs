@@ -4038,6 +4038,7 @@ fn test_case_0201() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4075,6 +4076,7 @@ fn test_case_0202() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4112,6 +4114,7 @@ fn test_case_0203() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4149,6 +4152,7 @@ fn test_case_0204() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4186,6 +4190,7 @@ fn test_case_0205() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4223,6 +4228,7 @@ fn test_case_0206() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4260,6 +4266,7 @@ fn test_case_0207() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4297,6 +4304,7 @@ fn test_case_0208() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4334,6 +4342,7 @@ fn test_case_0209() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4371,6 +4380,7 @@ fn test_case_0210() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4408,6 +4418,7 @@ fn test_case_0211() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4445,6 +4456,7 @@ fn test_case_0212() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4482,6 +4494,7 @@ fn test_case_0213() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4519,6 +4532,7 @@ fn test_case_0214() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4556,6 +4570,7 @@ fn test_case_0215() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4593,6 +4608,7 @@ fn test_case_0216() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4630,6 +4646,7 @@ fn test_case_0217() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4667,6 +4684,7 @@ fn test_case_0218() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4704,6 +4722,7 @@ fn test_case_0219() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4741,6 +4760,7 @@ fn test_case_0220() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4778,6 +4798,7 @@ fn test_case_0221() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4815,6 +4836,7 @@ fn test_case_0222() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4852,6 +4874,7 @@ fn test_case_0223() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4889,6 +4912,7 @@ fn test_case_0224() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4926,6 +4950,7 @@ fn test_case_0225() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -4963,6 +4988,7 @@ fn test_case_0226() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5000,6 +5026,7 @@ fn test_case_0227() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5037,6 +5064,7 @@ fn test_case_0228() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5074,6 +5102,7 @@ fn test_case_0229() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5111,6 +5140,7 @@ fn test_case_0230() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5148,6 +5178,7 @@ fn test_case_0231() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5185,6 +5216,7 @@ fn test_case_0232() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5222,6 +5254,7 @@ fn test_case_0233() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5259,6 +5292,7 @@ fn test_case_0234() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5296,6 +5330,7 @@ fn test_case_0235() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5333,6 +5368,7 @@ fn test_case_0236() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5370,6 +5406,7 @@ fn test_case_0237() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5407,6 +5444,7 @@ fn test_case_0238() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5444,6 +5482,7 @@ fn test_case_0239() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5481,6 +5520,7 @@ fn test_case_0240() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5518,6 +5558,7 @@ fn test_case_0241() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5555,6 +5596,7 @@ fn test_case_0242() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5592,6 +5634,7 @@ fn test_case_0243() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5629,6 +5672,7 @@ fn test_case_0244() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5666,6 +5710,7 @@ fn test_case_0245() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5703,6 +5748,7 @@ fn test_case_0246() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5740,6 +5786,7 @@ fn test_case_0247() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5777,6 +5824,7 @@ fn test_case_0248() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5814,6 +5862,7 @@ fn test_case_0249() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5851,6 +5900,7 @@ fn test_case_0250() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5888,6 +5938,7 @@ fn test_case_0251() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5925,6 +5976,7 @@ fn test_case_0252() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5962,6 +6014,7 @@ fn test_case_0253() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -5999,6 +6052,7 @@ fn test_case_0254() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6036,6 +6090,7 @@ fn test_case_0255() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6073,6 +6128,7 @@ fn test_case_0256() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6110,6 +6166,7 @@ fn test_case_0257() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6147,6 +6204,7 @@ fn test_case_0258() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6184,6 +6242,7 @@ fn test_case_0259() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6221,6 +6280,7 @@ fn test_case_0260() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6258,6 +6318,7 @@ fn test_case_0261() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6295,6 +6356,7 @@ fn test_case_0262() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6332,6 +6394,7 @@ fn test_case_0263() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6369,6 +6432,7 @@ fn test_case_0264() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6406,6 +6470,7 @@ fn test_case_0265() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6443,6 +6508,7 @@ fn test_case_0266() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6480,6 +6546,7 @@ fn test_case_0267() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6517,6 +6584,7 @@ fn test_case_0268() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6554,6 +6622,7 @@ fn test_case_0269() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6591,6 +6660,7 @@ fn test_case_0270() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6628,6 +6698,7 @@ fn test_case_0271() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6665,6 +6736,7 @@ fn test_case_0272() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6702,6 +6774,7 @@ fn test_case_0273() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6739,6 +6812,7 @@ fn test_case_0274() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6776,6 +6850,7 @@ fn test_case_0275() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6813,6 +6888,7 @@ fn test_case_0276() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6850,6 +6926,7 @@ fn test_case_0277() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6887,6 +6964,7 @@ fn test_case_0278() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6924,6 +7002,7 @@ fn test_case_0279() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6961,6 +7040,7 @@ fn test_case_0280() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -6998,6 +7078,7 @@ fn test_case_0281() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7035,6 +7116,7 @@ fn test_case_0282() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7072,6 +7154,7 @@ fn test_case_0283() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7109,6 +7192,7 @@ fn test_case_0284() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7146,6 +7230,7 @@ fn test_case_0285() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7183,6 +7268,7 @@ fn test_case_0286() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7220,6 +7306,7 @@ fn test_case_0287() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7257,6 +7344,7 @@ fn test_case_0288() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7294,6 +7382,7 @@ fn test_case_0289() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7331,6 +7420,7 @@ fn test_case_0290() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7368,6 +7458,7 @@ fn test_case_0291() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7405,6 +7496,7 @@ fn test_case_0292() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7442,6 +7534,7 @@ fn test_case_0293() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7479,6 +7572,7 @@ fn test_case_0294() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7516,6 +7610,7 @@ fn test_case_0295() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7553,6 +7648,7 @@ fn test_case_0296() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7590,6 +7686,7 @@ fn test_case_0297() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7627,6 +7724,7 @@ fn test_case_0298() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7664,6 +7762,7 @@ fn test_case_0299() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7701,6 +7800,7 @@ fn test_case_0300() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7738,6 +7838,7 @@ fn test_case_0301() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7775,6 +7876,7 @@ fn test_case_0302() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7812,6 +7914,7 @@ fn test_case_0303() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7849,6 +7952,7 @@ fn test_case_0304() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7886,6 +7990,7 @@ fn test_case_0305() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7923,6 +8028,7 @@ fn test_case_0306() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7960,6 +8066,7 @@ fn test_case_0307() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -7997,6 +8104,7 @@ fn test_case_0308() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8034,6 +8142,7 @@ fn test_case_0309() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8071,6 +8180,7 @@ fn test_case_0310() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8108,6 +8218,7 @@ fn test_case_0311() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8145,6 +8256,7 @@ fn test_case_0312() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8182,6 +8294,7 @@ fn test_case_0313() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8219,6 +8332,7 @@ fn test_case_0314() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8256,6 +8370,7 @@ fn test_case_0315() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8293,6 +8408,7 @@ fn test_case_0316() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8330,6 +8446,7 @@ fn test_case_0317() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8367,6 +8484,7 @@ fn test_case_0318() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8404,6 +8522,7 @@ fn test_case_0319() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8441,6 +8560,7 @@ fn test_case_0320() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8478,6 +8598,7 @@ fn test_case_0321() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8515,6 +8636,7 @@ fn test_case_0322() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8552,6 +8674,7 @@ fn test_case_0323() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8589,6 +8712,7 @@ fn test_case_0324() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8626,6 +8750,7 @@ fn test_case_0325() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8663,6 +8788,7 @@ fn test_case_0326() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8700,6 +8826,7 @@ fn test_case_0327() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8737,6 +8864,7 @@ fn test_case_0328() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8774,6 +8902,7 @@ fn test_case_0329() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8811,6 +8940,7 @@ fn test_case_0330() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8848,6 +8978,7 @@ fn test_case_0331() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8885,6 +9016,7 @@ fn test_case_0332() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8922,6 +9054,7 @@ fn test_case_0333() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8959,6 +9092,7 @@ fn test_case_0334() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -8996,6 +9130,7 @@ fn test_case_0335() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9033,6 +9168,7 @@ fn test_case_0336() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9070,6 +9206,7 @@ fn test_case_0337() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9107,6 +9244,7 @@ fn test_case_0338() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9144,6 +9282,7 @@ fn test_case_0339() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9181,6 +9320,7 @@ fn test_case_0340() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9218,6 +9358,7 @@ fn test_case_0341() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9255,6 +9396,7 @@ fn test_case_0342() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9292,6 +9434,7 @@ fn test_case_0343() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9329,6 +9472,7 @@ fn test_case_0344() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9366,6 +9510,7 @@ fn test_case_0345() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9403,6 +9548,7 @@ fn test_case_0346() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9440,6 +9586,7 @@ fn test_case_0347() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9477,6 +9624,7 @@ fn test_case_0348() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9514,6 +9662,7 @@ fn test_case_0349() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9551,6 +9700,7 @@ fn test_case_0350() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9597,6 +9747,7 @@ fn test_case_0351() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9643,6 +9794,7 @@ fn test_case_0352() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9689,6 +9841,7 @@ fn test_case_0353() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9735,6 +9888,7 @@ fn test_case_0354() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9781,6 +9935,7 @@ fn test_case_0355() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9827,6 +9982,7 @@ fn test_case_0356() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9873,6 +10029,7 @@ fn test_case_0357() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9919,6 +10076,7 @@ fn test_case_0358() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -9965,6 +10123,7 @@ fn test_case_0359() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10011,6 +10170,7 @@ fn test_case_0360() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10057,6 +10217,7 @@ fn test_case_0361() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10103,6 +10264,7 @@ fn test_case_0362() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10149,6 +10311,7 @@ fn test_case_0363() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10195,6 +10358,7 @@ fn test_case_0364() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10241,6 +10405,7 @@ fn test_case_0365() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10287,6 +10452,7 @@ fn test_case_0366() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10333,6 +10499,7 @@ fn test_case_0367() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10379,6 +10546,7 @@ fn test_case_0368() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10425,6 +10593,7 @@ fn test_case_0369() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10471,6 +10640,7 @@ fn test_case_0370() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10517,6 +10687,7 @@ fn test_case_0371() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10563,6 +10734,7 @@ fn test_case_0372() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10609,6 +10781,7 @@ fn test_case_0373() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10655,6 +10828,7 @@ fn test_case_0374() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10701,6 +10875,7 @@ fn test_case_0375() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10747,6 +10922,7 @@ fn test_case_0376() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10793,6 +10969,7 @@ fn test_case_0377() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10839,6 +11016,7 @@ fn test_case_0378() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10885,6 +11063,7 @@ fn test_case_0379() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10931,6 +11110,7 @@ fn test_case_0380() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -10977,6 +11157,7 @@ fn test_case_0381() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11023,6 +11204,7 @@ fn test_case_0382() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11069,6 +11251,7 @@ fn test_case_0383() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11115,6 +11298,7 @@ fn test_case_0384() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11161,6 +11345,7 @@ fn test_case_0385() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11207,6 +11392,7 @@ fn test_case_0386() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11253,6 +11439,7 @@ fn test_case_0387() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11299,6 +11486,7 @@ fn test_case_0388() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11345,6 +11533,7 @@ fn test_case_0389() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11391,6 +11580,7 @@ fn test_case_0390() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11437,6 +11627,7 @@ fn test_case_0391() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11483,6 +11674,7 @@ fn test_case_0392() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11529,6 +11721,7 @@ fn test_case_0393() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11575,6 +11768,7 @@ fn test_case_0394() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11621,6 +11815,7 @@ fn test_case_0395() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11667,6 +11862,7 @@ fn test_case_0396() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11713,6 +11909,7 @@ fn test_case_0397() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11759,6 +11956,7 @@ fn test_case_0398() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11805,6 +12003,7 @@ fn test_case_0399() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11851,6 +12050,7 @@ fn test_case_0400() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11897,6 +12097,7 @@ fn test_case_0401() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11943,6 +12144,7 @@ fn test_case_0402() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -11989,6 +12191,7 @@ fn test_case_0403() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12035,6 +12238,7 @@ fn test_case_0404() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12081,6 +12285,7 @@ fn test_case_0405() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12127,6 +12332,7 @@ fn test_case_0406() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12173,6 +12379,7 @@ fn test_case_0407() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12219,6 +12426,7 @@ fn test_case_0408() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12265,6 +12473,7 @@ fn test_case_0409() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12311,6 +12520,7 @@ fn test_case_0410() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12357,6 +12567,7 @@ fn test_case_0411() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12403,6 +12614,7 @@ fn test_case_0412() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12449,6 +12661,7 @@ fn test_case_0413() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12495,6 +12708,7 @@ fn test_case_0414() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12541,6 +12755,7 @@ fn test_case_0415() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12587,6 +12802,7 @@ fn test_case_0416() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12633,6 +12849,7 @@ fn test_case_0417() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12679,6 +12896,7 @@ fn test_case_0418() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12725,6 +12943,7 @@ fn test_case_0419() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12771,6 +12990,7 @@ fn test_case_0420() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12817,6 +13037,7 @@ fn test_case_0421() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12863,6 +13084,7 @@ fn test_case_0422() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12909,6 +13131,7 @@ fn test_case_0423() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -12955,6 +13178,7 @@ fn test_case_0424() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13001,6 +13225,7 @@ fn test_case_0425() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13047,6 +13272,7 @@ fn test_case_0426() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13093,6 +13319,7 @@ fn test_case_0427() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13139,6 +13366,7 @@ fn test_case_0428() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13185,6 +13413,7 @@ fn test_case_0429() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13231,6 +13460,7 @@ fn test_case_0430() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13277,6 +13507,7 @@ fn test_case_0431() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13323,6 +13554,7 @@ fn test_case_0432() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13369,6 +13601,7 @@ fn test_case_0433() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13415,6 +13648,7 @@ fn test_case_0434() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13461,6 +13695,7 @@ fn test_case_0435() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13507,6 +13742,7 @@ fn test_case_0436() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13553,6 +13789,7 @@ fn test_case_0437() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13599,6 +13836,7 @@ fn test_case_0438() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13645,6 +13883,7 @@ fn test_case_0439() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13691,6 +13930,7 @@ fn test_case_0440() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13737,6 +13977,7 @@ fn test_case_0441() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13783,6 +14024,7 @@ fn test_case_0442() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13829,6 +14071,7 @@ fn test_case_0443() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13875,6 +14118,7 @@ fn test_case_0444() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13921,6 +14165,7 @@ fn test_case_0445() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -13967,6 +14212,7 @@ fn test_case_0446() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14013,6 +14259,7 @@ fn test_case_0447() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14059,6 +14306,7 @@ fn test_case_0448() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14105,6 +14353,7 @@ fn test_case_0449() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14151,6 +14400,7 @@ fn test_case_0450() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14197,6 +14447,7 @@ fn test_case_0451() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14243,6 +14494,7 @@ fn test_case_0452() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14289,6 +14541,7 @@ fn test_case_0453() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14335,6 +14588,7 @@ fn test_case_0454() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14381,6 +14635,7 @@ fn test_case_0455() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14427,6 +14682,7 @@ fn test_case_0456() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14473,6 +14729,7 @@ fn test_case_0457() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14519,6 +14776,7 @@ fn test_case_0458() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14565,6 +14823,7 @@ fn test_case_0459() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14611,6 +14870,7 @@ fn test_case_0460() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14657,6 +14917,7 @@ fn test_case_0461() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14703,6 +14964,7 @@ fn test_case_0462() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14749,6 +15011,7 @@ fn test_case_0463() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14795,6 +15058,7 @@ fn test_case_0464() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14841,6 +15105,7 @@ fn test_case_0465() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14887,6 +15152,7 @@ fn test_case_0466() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14933,6 +15199,7 @@ fn test_case_0467() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -14979,6 +15246,7 @@ fn test_case_0468() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15025,6 +15293,7 @@ fn test_case_0469() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15071,6 +15340,7 @@ fn test_case_0470() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15117,6 +15387,7 @@ fn test_case_0471() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15163,6 +15434,7 @@ fn test_case_0472() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15209,6 +15481,7 @@ fn test_case_0473() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15255,6 +15528,7 @@ fn test_case_0474() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15301,6 +15575,7 @@ fn test_case_0475() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15347,6 +15622,7 @@ fn test_case_0476() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15393,6 +15669,7 @@ fn test_case_0477() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15439,6 +15716,7 @@ fn test_case_0478() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15485,6 +15763,7 @@ fn test_case_0479() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15531,6 +15810,7 @@ fn test_case_0480() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15577,6 +15857,7 @@ fn test_case_0481() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15623,6 +15904,7 @@ fn test_case_0482() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15669,6 +15951,7 @@ fn test_case_0483() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15715,6 +15998,7 @@ fn test_case_0484() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15761,6 +16045,7 @@ fn test_case_0485() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15807,6 +16092,7 @@ fn test_case_0486() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15853,6 +16139,7 @@ fn test_case_0487() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15899,6 +16186,7 @@ fn test_case_0488() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15945,6 +16233,7 @@ fn test_case_0489() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -15991,6 +16280,7 @@ fn test_case_0490() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16037,6 +16327,7 @@ fn test_case_0491() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16083,6 +16374,7 @@ fn test_case_0492() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16129,6 +16421,7 @@ fn test_case_0493() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16175,6 +16468,7 @@ fn test_case_0494() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16221,6 +16515,7 @@ fn test_case_0495() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16267,6 +16562,7 @@ fn test_case_0496() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16313,6 +16609,7 @@ fn test_case_0497() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16359,6 +16656,7 @@ fn test_case_0498() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16405,6 +16703,7 @@ fn test_case_0499() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16451,6 +16750,7 @@ fn test_case_0500() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16497,6 +16797,7 @@ fn test_case_0501() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16543,6 +16844,7 @@ fn test_case_0502() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16589,6 +16891,7 @@ fn test_case_0503() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16635,6 +16938,7 @@ fn test_case_0504() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16681,6 +16985,7 @@ fn test_case_0505() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16727,6 +17032,7 @@ fn test_case_0506() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16773,6 +17079,7 @@ fn test_case_0507() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16819,6 +17126,7 @@ fn test_case_0508() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16865,6 +17173,7 @@ fn test_case_0509() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16911,6 +17220,7 @@ fn test_case_0510() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -16957,6 +17267,7 @@ fn test_case_0511() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17003,6 +17314,7 @@ fn test_case_0512() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17049,6 +17361,7 @@ fn test_case_0513() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17095,6 +17408,7 @@ fn test_case_0514() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17141,6 +17455,7 @@ fn test_case_0515() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17187,6 +17502,7 @@ fn test_case_0516() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17233,6 +17549,7 @@ fn test_case_0517() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17279,6 +17596,7 @@ fn test_case_0518() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17325,6 +17643,7 @@ fn test_case_0519() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17371,6 +17690,7 @@ fn test_case_0520() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17417,6 +17737,7 @@ fn test_case_0521() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17463,6 +17784,7 @@ fn test_case_0522() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17509,6 +17831,7 @@ fn test_case_0523() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17555,6 +17878,7 @@ fn test_case_0524() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17601,6 +17925,7 @@ fn test_case_0525() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17647,6 +17972,7 @@ fn test_case_0526() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17693,6 +18019,7 @@ fn test_case_0527() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17739,6 +18066,7 @@ fn test_case_0528() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17785,6 +18113,7 @@ fn test_case_0529() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17831,6 +18160,7 @@ fn test_case_0530() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17877,6 +18207,7 @@ fn test_case_0531() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17923,6 +18254,7 @@ fn test_case_0532() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -17969,6 +18301,7 @@ fn test_case_0533() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18015,6 +18348,7 @@ fn test_case_0534() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18061,6 +18395,7 @@ fn test_case_0535() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18107,6 +18442,7 @@ fn test_case_0536() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18153,6 +18489,7 @@ fn test_case_0537() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18199,6 +18536,7 @@ fn test_case_0538() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18245,6 +18583,7 @@ fn test_case_0539() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18291,6 +18630,7 @@ fn test_case_0540() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18337,6 +18677,7 @@ fn test_case_0541() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18383,6 +18724,7 @@ fn test_case_0542() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18429,6 +18771,7 @@ fn test_case_0543() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18475,6 +18818,7 @@ fn test_case_0544() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18521,6 +18865,7 @@ fn test_case_0545() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18567,6 +18912,7 @@ fn test_case_0546() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18613,6 +18959,7 @@ fn test_case_0547() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18659,6 +19006,7 @@ fn test_case_0548() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18705,6 +19053,7 @@ fn test_case_0549() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18751,6 +19100,7 @@ fn test_case_0550() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -18781,6 +19131,7 @@ fn test_case_0551() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 6);
@@ -18805,6 +19156,7 @@ fn test_case_0552() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 7);
@@ -18829,6 +19181,7 @@ fn test_case_0553() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 8);
@@ -18853,6 +19206,7 @@ fn test_case_0554() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 9);
@@ -18877,6 +19231,7 @@ fn test_case_0555() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 10);
@@ -18901,6 +19256,7 @@ fn test_case_0556() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 11);
@@ -18925,6 +19281,7 @@ fn test_case_0557() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 12);
@@ -18949,6 +19306,7 @@ fn test_case_0558() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 13);
@@ -18973,6 +19331,7 @@ fn test_case_0559() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 14);
@@ -18997,6 +19356,7 @@ fn test_case_0560() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 15);
@@ -19021,6 +19381,7 @@ fn test_case_0561() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 16);
@@ -19045,6 +19406,7 @@ fn test_case_0562() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 17);
@@ -19069,6 +19431,7 @@ fn test_case_0563() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 18);
@@ -19093,6 +19456,7 @@ fn test_case_0564() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 19);
@@ -19117,6 +19481,7 @@ fn test_case_0565() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 20);
@@ -19141,6 +19506,7 @@ fn test_case_0566() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 21);
@@ -19165,6 +19531,7 @@ fn test_case_0567() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 22);
@@ -19189,6 +19556,7 @@ fn test_case_0568() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 23);
@@ -19213,6 +19581,7 @@ fn test_case_0569() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 24);
@@ -19237,6 +19606,7 @@ fn test_case_0570() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 25);
@@ -19261,6 +19631,7 @@ fn test_case_0571() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 26);
@@ -19285,6 +19656,7 @@ fn test_case_0572() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 27);
@@ -19309,6 +19681,7 @@ fn test_case_0573() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 28);
@@ -19333,6 +19706,7 @@ fn test_case_0574() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 29);
@@ -19357,6 +19731,7 @@ fn test_case_0575() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 5);
@@ -19381,6 +19756,7 @@ fn test_case_0576() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 6);
@@ -19405,6 +19781,7 @@ fn test_case_0577() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 7);
@@ -19429,6 +19806,7 @@ fn test_case_0578() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 8);
@@ -19453,6 +19831,7 @@ fn test_case_0579() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 9);
@@ -19477,6 +19856,7 @@ fn test_case_0580() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 10);
@@ -19501,6 +19881,7 @@ fn test_case_0581() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 11);
@@ -19525,6 +19906,7 @@ fn test_case_0582() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 12);
@@ -19549,6 +19931,7 @@ fn test_case_0583() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 13);
@@ -19573,6 +19956,7 @@ fn test_case_0584() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 14);
@@ -19597,6 +19981,7 @@ fn test_case_0585() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 15);
@@ -19621,6 +20006,7 @@ fn test_case_0586() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 16);
@@ -19645,6 +20031,7 @@ fn test_case_0587() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 17);
@@ -19669,6 +20056,7 @@ fn test_case_0588() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 18);
@@ -19693,6 +20081,7 @@ fn test_case_0589() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 19);
@@ -19717,6 +20106,7 @@ fn test_case_0590() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 20);
@@ -19741,6 +20131,7 @@ fn test_case_0591() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 21);
@@ -19765,6 +20156,7 @@ fn test_case_0592() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 22);
@@ -19789,6 +20181,7 @@ fn test_case_0593() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 23);
@@ -19813,6 +20206,7 @@ fn test_case_0594() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 24);
@@ -19837,6 +20231,7 @@ fn test_case_0595() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 25);
@@ -19861,6 +20256,7 @@ fn test_case_0596() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 26);
@@ -19885,6 +20281,7 @@ fn test_case_0597() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 27);
@@ -19909,6 +20306,7 @@ fn test_case_0598() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 28);
@@ -19933,6 +20331,7 @@ fn test_case_0599() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 29);
@@ -19957,6 +20356,7 @@ fn test_case_0600() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 5);
@@ -19981,6 +20381,7 @@ fn test_case_0601() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 6);
@@ -20005,6 +20406,7 @@ fn test_case_0602() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 7);
@@ -20029,6 +20431,7 @@ fn test_case_0603() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 8);
@@ -20053,6 +20456,7 @@ fn test_case_0604() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 9);
@@ -20077,6 +20481,7 @@ fn test_case_0605() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 10);
@@ -20101,6 +20506,7 @@ fn test_case_0606() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 11);
@@ -20125,6 +20531,7 @@ fn test_case_0607() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 12);
@@ -20149,6 +20556,7 @@ fn test_case_0608() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 13);
@@ -20173,6 +20581,7 @@ fn test_case_0609() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 14);
@@ -20197,6 +20606,7 @@ fn test_case_0610() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 15);
@@ -20221,6 +20631,7 @@ fn test_case_0611() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 16);
@@ -20245,6 +20656,7 @@ fn test_case_0612() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 17);
@@ -20269,6 +20681,7 @@ fn test_case_0613() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 18);
@@ -20293,6 +20706,7 @@ fn test_case_0614() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 19);
@@ -20317,6 +20731,7 @@ fn test_case_0615() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 20);
@@ -20341,6 +20756,7 @@ fn test_case_0616() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 21);
@@ -20365,6 +20781,7 @@ fn test_case_0617() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 22);
@@ -20389,6 +20806,7 @@ fn test_case_0618() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 23);
@@ -20413,6 +20831,7 @@ fn test_case_0619() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 24);
@@ -20437,6 +20856,7 @@ fn test_case_0620() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 25);
@@ -20461,6 +20881,7 @@ fn test_case_0621() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 26);
@@ -20485,6 +20906,7 @@ fn test_case_0622() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 27);
@@ -20509,6 +20931,7 @@ fn test_case_0623() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 28);
@@ -20533,6 +20956,7 @@ fn test_case_0624() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 29);
@@ -20557,6 +20981,7 @@ fn test_case_0625() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 5);
@@ -20581,6 +21006,7 @@ fn test_case_0626() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 6);
@@ -20605,6 +21031,7 @@ fn test_case_0627() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 7);
@@ -20629,6 +21056,7 @@ fn test_case_0628() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 8);
@@ -20653,6 +21081,7 @@ fn test_case_0629() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 9);
@@ -20677,6 +21106,7 @@ fn test_case_0630() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 10);
@@ -20701,6 +21131,7 @@ fn test_case_0631() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 11);
@@ -20725,6 +21156,7 @@ fn test_case_0632() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 12);
@@ -20749,6 +21181,7 @@ fn test_case_0633() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 13);
@@ -20773,6 +21206,7 @@ fn test_case_0634() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 14);
@@ -20797,6 +21231,7 @@ fn test_case_0635() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 15);
@@ -20821,6 +21256,7 @@ fn test_case_0636() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 16);
@@ -20845,6 +21281,7 @@ fn test_case_0637() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 17);
@@ -20869,6 +21306,7 @@ fn test_case_0638() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 18);
@@ -20893,6 +21331,7 @@ fn test_case_0639() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 19);
@@ -20917,6 +21356,7 @@ fn test_case_0640() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 20);
@@ -20941,6 +21381,7 @@ fn test_case_0641() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 21);
@@ -20965,6 +21406,7 @@ fn test_case_0642() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 22);
@@ -20989,6 +21431,7 @@ fn test_case_0643() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 23);
@@ -21013,6 +21456,7 @@ fn test_case_0644() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 24);
@@ -21037,6 +21481,7 @@ fn test_case_0645() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 25);
@@ -21061,6 +21506,7 @@ fn test_case_0646() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 26);
@@ -21085,6 +21531,7 @@ fn test_case_0647() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 27);
@@ -21109,6 +21556,7 @@ fn test_case_0648() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 28);
@@ -21133,6 +21581,7 @@ fn test_case_0649() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 29);
@@ -21157,6 +21606,7 @@ fn test_case_0650() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 5);
@@ -21181,6 +21631,7 @@ fn test_case_0651() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 6);
@@ -21205,6 +21656,7 @@ fn test_case_0652() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 7);
@@ -21229,6 +21681,7 @@ fn test_case_0653() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 8);
@@ -21253,6 +21706,7 @@ fn test_case_0654() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 9);
@@ -21277,6 +21731,7 @@ fn test_case_0655() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 10);
@@ -21301,6 +21756,7 @@ fn test_case_0656() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 11);
@@ -21325,6 +21781,7 @@ fn test_case_0657() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 12);
@@ -21349,6 +21806,7 @@ fn test_case_0658() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 13);
@@ -21373,6 +21831,7 @@ fn test_case_0659() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 14);
@@ -21397,6 +21856,7 @@ fn test_case_0660() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 15);
@@ -21421,6 +21881,7 @@ fn test_case_0661() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 16);
@@ -21445,6 +21906,7 @@ fn test_case_0662() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 17);
@@ -21469,6 +21931,7 @@ fn test_case_0663() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 18);
@@ -21493,6 +21956,7 @@ fn test_case_0664() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 19);
@@ -21517,6 +21981,7 @@ fn test_case_0665() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 20);
@@ -21541,6 +22006,7 @@ fn test_case_0666() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 21);
@@ -21565,6 +22031,7 @@ fn test_case_0667() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 22);
@@ -21589,6 +22056,7 @@ fn test_case_0668() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 23);
@@ -21613,6 +22081,7 @@ fn test_case_0669() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 24);
@@ -21637,6 +22106,7 @@ fn test_case_0670() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 25);
@@ -21661,6 +22131,7 @@ fn test_case_0671() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 26);
@@ -21685,6 +22156,7 @@ fn test_case_0672() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 27);
@@ -21709,6 +22181,7 @@ fn test_case_0673() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 28);
@@ -21733,6 +22206,7 @@ fn test_case_0674() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 29);
@@ -21757,6 +22231,7 @@ fn test_case_0675() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 5);
@@ -21781,6 +22256,7 @@ fn test_case_0676() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 6);
@@ -21805,6 +22281,7 @@ fn test_case_0677() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 7);
@@ -21829,6 +22306,7 @@ fn test_case_0678() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 8);
@@ -21853,6 +22331,7 @@ fn test_case_0679() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 9);
@@ -21877,6 +22356,7 @@ fn test_case_0680() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 10);
@@ -21901,6 +22381,7 @@ fn test_case_0681() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 11);
@@ -21925,6 +22406,7 @@ fn test_case_0682() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 12);
@@ -21949,6 +22431,7 @@ fn test_case_0683() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 13);
@@ -21973,6 +22456,7 @@ fn test_case_0684() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 14);
@@ -21997,6 +22481,7 @@ fn test_case_0685() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 15);
@@ -22021,6 +22506,7 @@ fn test_case_0686() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 16);
@@ -22045,6 +22531,7 @@ fn test_case_0687() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 17);
@@ -22069,6 +22556,7 @@ fn test_case_0688() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 18);
@@ -22093,6 +22581,7 @@ fn test_case_0689() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 19);
@@ -22117,6 +22606,7 @@ fn test_case_0690() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 20);
@@ -22141,6 +22631,7 @@ fn test_case_0691() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 21);
@@ -22165,6 +22656,7 @@ fn test_case_0692() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 22);
@@ -22189,6 +22681,7 @@ fn test_case_0693() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 23);
@@ -22213,6 +22706,7 @@ fn test_case_0694() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 24);
@@ -22237,6 +22731,7 @@ fn test_case_0695() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 25);
@@ -22261,6 +22756,7 @@ fn test_case_0696() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 26);
@@ -22285,6 +22781,7 @@ fn test_case_0697() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 27);
@@ -22309,6 +22806,7 @@ fn test_case_0698() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 28);
@@ -22333,6 +22831,7 @@ fn test_case_0699() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 29);
@@ -22357,6 +22856,7 @@ fn test_case_0700() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 5);
@@ -22381,6 +22881,7 @@ fn test_case_0701() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 6);
@@ -22405,6 +22906,7 @@ fn test_case_0702() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 7);
@@ -22429,6 +22931,7 @@ fn test_case_0703() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 8);
@@ -22453,6 +22956,7 @@ fn test_case_0704() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 9);
@@ -22477,6 +22981,7 @@ fn test_case_0705() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 10);
@@ -22501,6 +23006,7 @@ fn test_case_0706() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 11);
@@ -22525,6 +23031,7 @@ fn test_case_0707() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 12);
@@ -22549,6 +23056,7 @@ fn test_case_0708() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 13);
@@ -22573,6 +23081,7 @@ fn test_case_0709() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 14);
@@ -22597,6 +23106,7 @@ fn test_case_0710() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 15);
@@ -22621,6 +23131,7 @@ fn test_case_0711() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 16);
@@ -22645,6 +23156,7 @@ fn test_case_0712() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 17);
@@ -22669,6 +23181,7 @@ fn test_case_0713() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 18);
@@ -22693,6 +23206,7 @@ fn test_case_0714() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 19);
@@ -22717,6 +23231,7 @@ fn test_case_0715() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 20);
@@ -22741,6 +23256,7 @@ fn test_case_0716() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 21);
@@ -22765,6 +23281,7 @@ fn test_case_0717() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 22);
@@ -22789,6 +23306,7 @@ fn test_case_0718() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 23);
@@ -22813,6 +23331,7 @@ fn test_case_0719() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 24);
@@ -22837,6 +23356,7 @@ fn test_case_0720() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 25);
@@ -22861,6 +23381,7 @@ fn test_case_0721() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 26);
@@ -22885,6 +23406,7 @@ fn test_case_0722() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 27);
@@ -22909,6 +23431,7 @@ fn test_case_0723() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 28);
@@ -22933,6 +23456,7 @@ fn test_case_0724() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 29);
@@ -22957,6 +23481,7 @@ fn test_case_0725() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 5);
@@ -22981,6 +23506,7 @@ fn test_case_0726() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 6);
@@ -23005,6 +23531,7 @@ fn test_case_0727() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 7);
@@ -23029,6 +23556,7 @@ fn test_case_0728() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 8);
@@ -23053,6 +23581,7 @@ fn test_case_0729() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 9);
@@ -23077,6 +23606,7 @@ fn test_case_0730() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 10);
@@ -23101,6 +23631,7 @@ fn test_case_0731() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 11);
@@ -23125,6 +23656,7 @@ fn test_case_0732() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 12);
@@ -23149,6 +23681,7 @@ fn test_case_0733() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 13);
@@ -23173,6 +23706,7 @@ fn test_case_0734() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 14);
@@ -23197,6 +23731,7 @@ fn test_case_0735() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 15);
@@ -23221,6 +23756,7 @@ fn test_case_0736() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 16);
@@ -23245,6 +23781,7 @@ fn test_case_0737() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 17);
@@ -23269,6 +23806,7 @@ fn test_case_0738() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 18);
@@ -23293,6 +23831,7 @@ fn test_case_0739() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 19);
@@ -23317,6 +23856,7 @@ fn test_case_0740() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 20);
@@ -23341,6 +23881,7 @@ fn test_case_0741() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 21);
@@ -23365,6 +23906,7 @@ fn test_case_0742() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 22);
@@ -23389,6 +23931,7 @@ fn test_case_0743() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 23);
@@ -23413,6 +23956,7 @@ fn test_case_0744() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 24);
@@ -23437,6 +23981,7 @@ fn test_case_0745() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 25);
@@ -23461,6 +24006,7 @@ fn test_case_0746() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 26);
@@ -23485,6 +24031,7 @@ fn test_case_0747() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 27);
@@ -23509,6 +24056,7 @@ fn test_case_0748() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 28);
@@ -23533,6 +24081,7 @@ fn test_case_0749() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 29);
@@ -23557,6 +24106,7 @@ fn test_case_0750() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(res.answers.len(), 5);
@@ -23588,6 +24138,7 @@ fn test_case_0751() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -23605,6 +24156,7 @@ fn test_case_0751() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -23639,6 +24191,7 @@ fn test_case_0752() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -23656,6 +24209,7 @@ fn test_case_0752() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -23690,6 +24244,7 @@ fn test_case_0753() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -23707,6 +24262,7 @@ fn test_case_0753() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -23741,6 +24297,7 @@ fn test_case_0754() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -23758,6 +24315,7 @@ fn test_case_0754() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -23792,6 +24350,7 @@ fn test_case_0755() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -23809,6 +24368,7 @@ fn test_case_0755() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -23843,6 +24403,7 @@ fn test_case_0756() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -23860,6 +24421,7 @@ fn test_case_0756() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -23894,6 +24456,7 @@ fn test_case_0757() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -23911,6 +24474,7 @@ fn test_case_0757() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -23945,6 +24509,7 @@ fn test_case_0758() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -23962,6 +24527,7 @@ fn test_case_0758() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -23996,6 +24562,7 @@ fn test_case_0759() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24013,6 +24580,7 @@ fn test_case_0759() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24047,6 +24615,7 @@ fn test_case_0760() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24064,6 +24633,7 @@ fn test_case_0760() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24098,6 +24668,7 @@ fn test_case_0761() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24115,6 +24686,7 @@ fn test_case_0761() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24149,6 +24721,7 @@ fn test_case_0762() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24166,6 +24739,7 @@ fn test_case_0762() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24200,6 +24774,7 @@ fn test_case_0763() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24217,6 +24792,7 @@ fn test_case_0763() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24251,6 +24827,7 @@ fn test_case_0764() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24268,6 +24845,7 @@ fn test_case_0764() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24302,6 +24880,7 @@ fn test_case_0765() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24319,6 +24898,7 @@ fn test_case_0765() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24353,6 +24933,7 @@ fn test_case_0766() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24370,6 +24951,7 @@ fn test_case_0766() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24404,6 +24986,7 @@ fn test_case_0767() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24421,6 +25004,7 @@ fn test_case_0767() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24455,6 +25039,7 @@ fn test_case_0768() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24472,6 +25057,7 @@ fn test_case_0768() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24506,6 +25092,7 @@ fn test_case_0769() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24523,6 +25110,7 @@ fn test_case_0769() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24557,6 +25145,7 @@ fn test_case_0770() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24574,6 +25163,7 @@ fn test_case_0770() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24608,6 +25198,7 @@ fn test_case_0771() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24625,6 +25216,7 @@ fn test_case_0771() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24659,6 +25251,7 @@ fn test_case_0772() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24676,6 +25269,7 @@ fn test_case_0772() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24710,6 +25304,7 @@ fn test_case_0773() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24727,6 +25322,7 @@ fn test_case_0773() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24761,6 +25357,7 @@ fn test_case_0774() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24778,6 +25375,7 @@ fn test_case_0774() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24812,6 +25410,7 @@ fn test_case_0775() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24829,6 +25428,7 @@ fn test_case_0775() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24863,6 +25463,7 @@ fn test_case_0776() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24880,6 +25481,7 @@ fn test_case_0776() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24914,6 +25516,7 @@ fn test_case_0777() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24931,6 +25534,7 @@ fn test_case_0777() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -24965,6 +25569,7 @@ fn test_case_0778() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -24982,6 +25587,7 @@ fn test_case_0778() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25016,6 +25622,7 @@ fn test_case_0779() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25033,6 +25640,7 @@ fn test_case_0779() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25067,6 +25675,7 @@ fn test_case_0780() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25084,6 +25693,7 @@ fn test_case_0780() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25118,6 +25728,7 @@ fn test_case_0781() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25135,6 +25746,7 @@ fn test_case_0781() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25169,6 +25781,7 @@ fn test_case_0782() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25186,6 +25799,7 @@ fn test_case_0782() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25220,6 +25834,7 @@ fn test_case_0783() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25237,6 +25852,7 @@ fn test_case_0783() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25271,6 +25887,7 @@ fn test_case_0784() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25288,6 +25905,7 @@ fn test_case_0784() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25322,6 +25940,7 @@ fn test_case_0785() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25339,6 +25958,7 @@ fn test_case_0785() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25373,6 +25993,7 @@ fn test_case_0786() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25390,6 +26011,7 @@ fn test_case_0786() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25424,6 +26046,7 @@ fn test_case_0787() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25441,6 +26064,7 @@ fn test_case_0787() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25475,6 +26099,7 @@ fn test_case_0788() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25492,6 +26117,7 @@ fn test_case_0788() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25526,6 +26152,7 @@ fn test_case_0789() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25543,6 +26170,7 @@ fn test_case_0789() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25577,6 +26205,7 @@ fn test_case_0790() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25594,6 +26223,7 @@ fn test_case_0790() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25628,6 +26258,7 @@ fn test_case_0791() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25645,6 +26276,7 @@ fn test_case_0791() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25679,6 +26311,7 @@ fn test_case_0792() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25696,6 +26329,7 @@ fn test_case_0792() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25730,6 +26364,7 @@ fn test_case_0793() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25747,6 +26382,7 @@ fn test_case_0793() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25781,6 +26417,7 @@ fn test_case_0794() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25798,6 +26435,7 @@ fn test_case_0794() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25832,6 +26470,7 @@ fn test_case_0795() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25849,6 +26488,7 @@ fn test_case_0795() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25883,6 +26523,7 @@ fn test_case_0796() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25900,6 +26541,7 @@ fn test_case_0796() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25934,6 +26576,7 @@ fn test_case_0797() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -25951,6 +26594,7 @@ fn test_case_0797() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -25985,6 +26629,7 @@ fn test_case_0798() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26002,6 +26647,7 @@ fn test_case_0798() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26036,6 +26682,7 @@ fn test_case_0799() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26053,6 +26700,7 @@ fn test_case_0799() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26087,6 +26735,7 @@ fn test_case_0800() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26104,6 +26753,7 @@ fn test_case_0800() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26138,6 +26788,7 @@ fn test_case_0801() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26155,6 +26806,7 @@ fn test_case_0801() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26189,6 +26841,7 @@ fn test_case_0802() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26206,6 +26859,7 @@ fn test_case_0802() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26240,6 +26894,7 @@ fn test_case_0803() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26257,6 +26912,7 @@ fn test_case_0803() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26291,6 +26947,7 @@ fn test_case_0804() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26308,6 +26965,7 @@ fn test_case_0804() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26342,6 +27000,7 @@ fn test_case_0805() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26359,6 +27018,7 @@ fn test_case_0805() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26393,6 +27053,7 @@ fn test_case_0806() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26410,6 +27071,7 @@ fn test_case_0806() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26444,6 +27106,7 @@ fn test_case_0807() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26461,6 +27124,7 @@ fn test_case_0807() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26495,6 +27159,7 @@ fn test_case_0808() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26512,6 +27177,7 @@ fn test_case_0808() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26546,6 +27212,7 @@ fn test_case_0809() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26563,6 +27230,7 @@ fn test_case_0809() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26597,6 +27265,7 @@ fn test_case_0810() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26614,6 +27283,7 @@ fn test_case_0810() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26648,6 +27318,7 @@ fn test_case_0811() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26665,6 +27336,7 @@ fn test_case_0811() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26699,6 +27371,7 @@ fn test_case_0812() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26716,6 +27389,7 @@ fn test_case_0812() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26750,6 +27424,7 @@ fn test_case_0813() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26767,6 +27442,7 @@ fn test_case_0813() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26801,6 +27477,7 @@ fn test_case_0814() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26818,6 +27495,7 @@ fn test_case_0814() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26852,6 +27530,7 @@ fn test_case_0815() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26869,6 +27548,7 @@ fn test_case_0815() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26903,6 +27583,7 @@ fn test_case_0816() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26920,6 +27601,7 @@ fn test_case_0816() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -26954,6 +27636,7 @@ fn test_case_0817() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -26971,6 +27654,7 @@ fn test_case_0817() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27005,6 +27689,7 @@ fn test_case_0818() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27022,6 +27707,7 @@ fn test_case_0818() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27056,6 +27742,7 @@ fn test_case_0819() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27073,6 +27760,7 @@ fn test_case_0819() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27107,6 +27795,7 @@ fn test_case_0820() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27124,6 +27813,7 @@ fn test_case_0820() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27158,6 +27848,7 @@ fn test_case_0821() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27175,6 +27866,7 @@ fn test_case_0821() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27209,6 +27901,7 @@ fn test_case_0822() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27226,6 +27919,7 @@ fn test_case_0822() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27260,6 +27954,7 @@ fn test_case_0823() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27277,6 +27972,7 @@ fn test_case_0823() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27311,6 +28007,7 @@ fn test_case_0824() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27328,6 +28025,7 @@ fn test_case_0824() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27362,6 +28060,7 @@ fn test_case_0825() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27379,6 +28078,7 @@ fn test_case_0825() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27413,6 +28113,7 @@ fn test_case_0826() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27430,6 +28131,7 @@ fn test_case_0826() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27464,6 +28166,7 @@ fn test_case_0827() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27481,6 +28184,7 @@ fn test_case_0827() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27515,6 +28219,7 @@ fn test_case_0828() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27532,6 +28237,7 @@ fn test_case_0828() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27566,6 +28272,7 @@ fn test_case_0829() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27583,6 +28290,7 @@ fn test_case_0829() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27617,6 +28325,7 @@ fn test_case_0830() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27634,6 +28343,7 @@ fn test_case_0830() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27668,6 +28378,7 @@ fn test_case_0831() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27685,6 +28396,7 @@ fn test_case_0831() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27719,6 +28431,7 @@ fn test_case_0832() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27736,6 +28449,7 @@ fn test_case_0832() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27770,6 +28484,7 @@ fn test_case_0833() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27787,6 +28502,7 @@ fn test_case_0833() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27821,6 +28537,7 @@ fn test_case_0834() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27838,6 +28555,7 @@ fn test_case_0834() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27872,6 +28590,7 @@ fn test_case_0835() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27889,6 +28608,7 @@ fn test_case_0835() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27923,6 +28643,7 @@ fn test_case_0836() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27940,6 +28661,7 @@ fn test_case_0836() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -27974,6 +28696,7 @@ fn test_case_0837() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -27991,6 +28714,7 @@ fn test_case_0837() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28025,6 +28749,7 @@ fn test_case_0838() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28042,6 +28767,7 @@ fn test_case_0838() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28076,6 +28802,7 @@ fn test_case_0839() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28093,6 +28820,7 @@ fn test_case_0839() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28127,6 +28855,7 @@ fn test_case_0840() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28144,6 +28873,7 @@ fn test_case_0840() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28178,6 +28908,7 @@ fn test_case_0841() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28195,6 +28926,7 @@ fn test_case_0841() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28229,6 +28961,7 @@ fn test_case_0842() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28246,6 +28979,7 @@ fn test_case_0842() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28280,6 +29014,7 @@ fn test_case_0843() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28297,6 +29032,7 @@ fn test_case_0843() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28331,6 +29067,7 @@ fn test_case_0844() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28348,6 +29085,7 @@ fn test_case_0844() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28382,6 +29120,7 @@ fn test_case_0845() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28399,6 +29138,7 @@ fn test_case_0845() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28433,6 +29173,7 @@ fn test_case_0846() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28450,6 +29191,7 @@ fn test_case_0846() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28484,6 +29226,7 @@ fn test_case_0847() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28501,6 +29244,7 @@ fn test_case_0847() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28535,6 +29279,7 @@ fn test_case_0848() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28552,6 +29297,7 @@ fn test_case_0848() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28586,6 +29332,7 @@ fn test_case_0849() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28603,6 +29350,7 @@ fn test_case_0849() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28637,6 +29385,7 @@ fn test_case_0850() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28654,6 +29403,7 @@ fn test_case_0850() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28688,6 +29438,7 @@ fn test_case_0851() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28705,6 +29456,7 @@ fn test_case_0851() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28739,6 +29491,7 @@ fn test_case_0852() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28756,6 +29509,7 @@ fn test_case_0852() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28790,6 +29544,7 @@ fn test_case_0853() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28807,6 +29562,7 @@ fn test_case_0853() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28841,6 +29597,7 @@ fn test_case_0854() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28858,6 +29615,7 @@ fn test_case_0854() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28892,6 +29650,7 @@ fn test_case_0855() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28909,6 +29668,7 @@ fn test_case_0855() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28943,6 +29703,7 @@ fn test_case_0856() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -28960,6 +29721,7 @@ fn test_case_0856() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -28994,6 +29756,7 @@ fn test_case_0857() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29011,6 +29774,7 @@ fn test_case_0857() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29045,6 +29809,7 @@ fn test_case_0858() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29062,6 +29827,7 @@ fn test_case_0858() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29096,6 +29862,7 @@ fn test_case_0859() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29113,6 +29880,7 @@ fn test_case_0859() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29147,6 +29915,7 @@ fn test_case_0860() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29164,6 +29933,7 @@ fn test_case_0860() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29198,6 +29968,7 @@ fn test_case_0861() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29215,6 +29986,7 @@ fn test_case_0861() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29249,6 +30021,7 @@ fn test_case_0862() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29266,6 +30039,7 @@ fn test_case_0862() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29300,6 +30074,7 @@ fn test_case_0863() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29317,6 +30092,7 @@ fn test_case_0863() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29351,6 +30127,7 @@ fn test_case_0864() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29368,6 +30145,7 @@ fn test_case_0864() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29402,6 +30180,7 @@ fn test_case_0865() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29419,6 +30198,7 @@ fn test_case_0865() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29453,6 +30233,7 @@ fn test_case_0866() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29470,6 +30251,7 @@ fn test_case_0866() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29504,6 +30286,7 @@ fn test_case_0867() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29521,6 +30304,7 @@ fn test_case_0867() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29555,6 +30339,7 @@ fn test_case_0868() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29572,6 +30357,7 @@ fn test_case_0868() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29606,6 +30392,7 @@ fn test_case_0869() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29623,6 +30410,7 @@ fn test_case_0869() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29657,6 +30445,7 @@ fn test_case_0870() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29674,6 +30463,7 @@ fn test_case_0870() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29708,6 +30498,7 @@ fn test_case_0871() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29725,6 +30516,7 @@ fn test_case_0871() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29759,6 +30551,7 @@ fn test_case_0872() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29776,6 +30569,7 @@ fn test_case_0872() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29810,6 +30604,7 @@ fn test_case_0873() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29827,6 +30622,7 @@ fn test_case_0873() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29861,6 +30657,7 @@ fn test_case_0874() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29878,6 +30675,7 @@ fn test_case_0874() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29912,6 +30710,7 @@ fn test_case_0875() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29929,6 +30728,7 @@ fn test_case_0875() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -29963,6 +30763,7 @@ fn test_case_0876() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -29980,6 +30781,7 @@ fn test_case_0876() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30014,6 +30816,7 @@ fn test_case_0877() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30031,6 +30834,7 @@ fn test_case_0877() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30065,6 +30869,7 @@ fn test_case_0878() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30082,6 +30887,7 @@ fn test_case_0878() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30116,6 +30922,7 @@ fn test_case_0879() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30133,6 +30940,7 @@ fn test_case_0879() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30167,6 +30975,7 @@ fn test_case_0880() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30184,6 +30993,7 @@ fn test_case_0880() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30218,6 +31028,7 @@ fn test_case_0881() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30235,6 +31046,7 @@ fn test_case_0881() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30269,6 +31081,7 @@ fn test_case_0882() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30286,6 +31099,7 @@ fn test_case_0882() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30320,6 +31134,7 @@ fn test_case_0883() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30337,6 +31152,7 @@ fn test_case_0883() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30371,6 +31187,7 @@ fn test_case_0884() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30388,6 +31205,7 @@ fn test_case_0884() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30422,6 +31240,7 @@ fn test_case_0885() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30439,6 +31258,7 @@ fn test_case_0885() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30473,6 +31293,7 @@ fn test_case_0886() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30490,6 +31311,7 @@ fn test_case_0886() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30524,6 +31346,7 @@ fn test_case_0887() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30541,6 +31364,7 @@ fn test_case_0887() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30575,6 +31399,7 @@ fn test_case_0888() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30592,6 +31417,7 @@ fn test_case_0888() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30626,6 +31452,7 @@ fn test_case_0889() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30643,6 +31470,7 @@ fn test_case_0889() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30677,6 +31505,7 @@ fn test_case_0890() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30694,6 +31523,7 @@ fn test_case_0890() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30728,6 +31558,7 @@ fn test_case_0891() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30745,6 +31576,7 @@ fn test_case_0891() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30779,6 +31611,7 @@ fn test_case_0892() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30796,6 +31629,7 @@ fn test_case_0892() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30830,6 +31664,7 @@ fn test_case_0893() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30847,6 +31682,7 @@ fn test_case_0893() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30881,6 +31717,7 @@ fn test_case_0894() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30898,6 +31735,7 @@ fn test_case_0894() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30932,6 +31770,7 @@ fn test_case_0895() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -30949,6 +31788,7 @@ fn test_case_0895() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -30983,6 +31823,7 @@ fn test_case_0896() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31000,6 +31841,7 @@ fn test_case_0896() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31034,6 +31876,7 @@ fn test_case_0897() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31051,6 +31894,7 @@ fn test_case_0897() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31085,6 +31929,7 @@ fn test_case_0898() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31102,6 +31947,7 @@ fn test_case_0898() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31136,6 +31982,7 @@ fn test_case_0899() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31153,6 +32000,7 @@ fn test_case_0899() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31187,6 +32035,7 @@ fn test_case_0900() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31204,6 +32053,7 @@ fn test_case_0900() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31238,6 +32088,7 @@ fn test_case_0901() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31255,6 +32106,7 @@ fn test_case_0901() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31289,6 +32141,7 @@ fn test_case_0902() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31306,6 +32159,7 @@ fn test_case_0902() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31340,6 +32194,7 @@ fn test_case_0903() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31357,6 +32212,7 @@ fn test_case_0903() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31391,6 +32247,7 @@ fn test_case_0904() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31408,6 +32265,7 @@ fn test_case_0904() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31442,6 +32300,7 @@ fn test_case_0905() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31459,6 +32318,7 @@ fn test_case_0905() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31493,6 +32353,7 @@ fn test_case_0906() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31510,6 +32371,7 @@ fn test_case_0906() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31544,6 +32406,7 @@ fn test_case_0907() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31561,6 +32424,7 @@ fn test_case_0907() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31595,6 +32459,7 @@ fn test_case_0908() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31612,6 +32477,7 @@ fn test_case_0908() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31646,6 +32512,7 @@ fn test_case_0909() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31663,6 +32530,7 @@ fn test_case_0909() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31697,6 +32565,7 @@ fn test_case_0910() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31714,6 +32583,7 @@ fn test_case_0910() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31748,6 +32618,7 @@ fn test_case_0911() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31765,6 +32636,7 @@ fn test_case_0911() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31799,6 +32671,7 @@ fn test_case_0912() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31816,6 +32689,7 @@ fn test_case_0912() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31850,6 +32724,7 @@ fn test_case_0913() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31867,6 +32742,7 @@ fn test_case_0913() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31901,6 +32777,7 @@ fn test_case_0914() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31918,6 +32795,7 @@ fn test_case_0914() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -31952,6 +32830,7 @@ fn test_case_0915() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -31969,6 +32848,7 @@ fn test_case_0915() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32003,6 +32883,7 @@ fn test_case_0916() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32020,6 +32901,7 @@ fn test_case_0916() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32054,6 +32936,7 @@ fn test_case_0917() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32071,6 +32954,7 @@ fn test_case_0917() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32105,6 +32989,7 @@ fn test_case_0918() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32122,6 +33007,7 @@ fn test_case_0918() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32156,6 +33042,7 @@ fn test_case_0919() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32173,6 +33060,7 @@ fn test_case_0919() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32207,6 +33095,7 @@ fn test_case_0920() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32224,6 +33113,7 @@ fn test_case_0920() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32258,6 +33148,7 @@ fn test_case_0921() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32275,6 +33166,7 @@ fn test_case_0921() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32309,6 +33201,7 @@ fn test_case_0922() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32326,6 +33219,7 @@ fn test_case_0922() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32360,6 +33254,7 @@ fn test_case_0923() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32377,6 +33272,7 @@ fn test_case_0923() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32411,6 +33307,7 @@ fn test_case_0924() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32428,6 +33325,7 @@ fn test_case_0924() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32462,6 +33360,7 @@ fn test_case_0925() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32479,6 +33378,7 @@ fn test_case_0925() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32513,6 +33413,7 @@ fn test_case_0926() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32530,6 +33431,7 @@ fn test_case_0926() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32564,6 +33466,7 @@ fn test_case_0927() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32581,6 +33484,7 @@ fn test_case_0927() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32615,6 +33519,7 @@ fn test_case_0928() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32632,6 +33537,7 @@ fn test_case_0928() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32666,6 +33572,7 @@ fn test_case_0929() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32683,6 +33590,7 @@ fn test_case_0929() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32717,6 +33625,7 @@ fn test_case_0930() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32734,6 +33643,7 @@ fn test_case_0930() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32768,6 +33678,7 @@ fn test_case_0931() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32785,6 +33696,7 @@ fn test_case_0931() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32819,6 +33731,7 @@ fn test_case_0932() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32836,6 +33749,7 @@ fn test_case_0932() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32870,6 +33784,7 @@ fn test_case_0933() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32887,6 +33802,7 @@ fn test_case_0933() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32921,6 +33837,7 @@ fn test_case_0934() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32938,6 +33855,7 @@ fn test_case_0934() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -32972,6 +33890,7 @@ fn test_case_0935() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -32989,6 +33908,7 @@ fn test_case_0935() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -33023,6 +33943,7 @@ fn test_case_0936() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -33040,6 +33961,7 @@ fn test_case_0936() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -33074,6 +33996,7 @@ fn test_case_0937() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -33091,6 +34014,7 @@ fn test_case_0937() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -33125,6 +34049,7 @@ fn test_case_0938() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -33142,6 +34067,7 @@ fn test_case_0938() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -33176,6 +34102,7 @@ fn test_case_0939() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -33193,6 +34120,7 @@ fn test_case_0939() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -33227,6 +34155,7 @@ fn test_case_0940() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -33244,6 +34173,7 @@ fn test_case_0940() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -33278,6 +34208,7 @@ fn test_case_0941() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -33295,6 +34226,7 @@ fn test_case_0941() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -33329,6 +34261,7 @@ fn test_case_0942() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -33346,6 +34279,7 @@ fn test_case_0942() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -33380,6 +34314,7 @@ fn test_case_0943() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -33397,6 +34332,7 @@ fn test_case_0943() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -33431,6 +34367,7 @@ fn test_case_0944() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -33448,6 +34385,7 @@ fn test_case_0944() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -33482,6 +34420,7 @@ fn test_case_0945() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -33499,6 +34438,7 @@ fn test_case_0945() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -33533,6 +34473,7 @@ fn test_case_0946() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -33550,6 +34491,7 @@ fn test_case_0946() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -33584,6 +34526,7 @@ fn test_case_0947() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -33601,6 +34544,7 @@ fn test_case_0947() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -33635,6 +34579,7 @@ fn test_case_0948() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -33652,6 +34597,7 @@ fn test_case_0948() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -33686,6 +34632,7 @@ fn test_case_0949() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -33703,6 +34650,7 @@ fn test_case_0949() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -33737,6 +34685,7 @@ fn test_case_0950() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res1 = engine.evaluate(&req1).unwrap();
     let mut rev_options = base_options;
@@ -33754,6 +34703,7 @@ fn test_case_0950() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res2 = engine.evaluate(&req2).unwrap();
     assert_eq!(
@@ -50797,6 +51747,7 @@ fn test_case_1751() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -50843,6 +51794,7 @@ fn test_case_1752() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -50889,6 +51841,7 @@ fn test_case_1753() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -50935,6 +51888,7 @@ fn test_case_1754() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -50981,6 +51935,7 @@ fn test_case_1755() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51027,6 +51982,7 @@ fn test_case_1756() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51073,6 +52029,7 @@ fn test_case_1757() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51119,6 +52076,7 @@ fn test_case_1758() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51165,6 +52123,7 @@ fn test_case_1759() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51211,6 +52170,7 @@ fn test_case_1760() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51257,6 +52217,7 @@ fn test_case_1761() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51303,6 +52264,7 @@ fn test_case_1762() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51349,6 +52311,7 @@ fn test_case_1763() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51395,6 +52358,7 @@ fn test_case_1764() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51441,6 +52405,7 @@ fn test_case_1765() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51487,6 +52452,7 @@ fn test_case_1766() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51533,6 +52499,7 @@ fn test_case_1767() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51579,6 +52546,7 @@ fn test_case_1768() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51625,6 +52593,7 @@ fn test_case_1769() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51671,6 +52640,7 @@ fn test_case_1770() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51717,6 +52687,7 @@ fn test_case_1771() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51763,6 +52734,7 @@ fn test_case_1772() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51809,6 +52781,7 @@ fn test_case_1773() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51855,6 +52828,7 @@ fn test_case_1774() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51901,6 +52875,7 @@ fn test_case_1775() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51947,6 +52922,7 @@ fn test_case_1776() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -51993,6 +52969,7 @@ fn test_case_1777() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52039,6 +53016,7 @@ fn test_case_1778() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52085,6 +53063,7 @@ fn test_case_1779() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52131,6 +53110,7 @@ fn test_case_1780() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52177,6 +53157,7 @@ fn test_case_1781() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52223,6 +53204,7 @@ fn test_case_1782() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52269,6 +53251,7 @@ fn test_case_1783() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52315,6 +53298,7 @@ fn test_case_1784() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52361,6 +53345,7 @@ fn test_case_1785() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52407,6 +53392,7 @@ fn test_case_1786() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52453,6 +53439,7 @@ fn test_case_1787() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52499,6 +53486,7 @@ fn test_case_1788() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52545,6 +53533,7 @@ fn test_case_1789() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52591,6 +53580,7 @@ fn test_case_1790() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52637,6 +53627,7 @@ fn test_case_1791() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52683,6 +53674,7 @@ fn test_case_1792() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52729,6 +53721,7 @@ fn test_case_1793() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52775,6 +53768,7 @@ fn test_case_1794() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52821,6 +53815,7 @@ fn test_case_1795() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52867,6 +53862,7 @@ fn test_case_1796() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52913,6 +53909,7 @@ fn test_case_1797() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -52959,6 +53956,7 @@ fn test_case_1798() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53005,6 +54003,7 @@ fn test_case_1799() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53051,6 +54050,7 @@ fn test_case_1800() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53097,6 +54097,7 @@ fn test_case_1801() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53143,6 +54144,7 @@ fn test_case_1802() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53189,6 +54191,7 @@ fn test_case_1803() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53235,6 +54238,7 @@ fn test_case_1804() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53281,6 +54285,7 @@ fn test_case_1805() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53327,6 +54332,7 @@ fn test_case_1806() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53373,6 +54379,7 @@ fn test_case_1807() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53419,6 +54426,7 @@ fn test_case_1808() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53465,6 +54473,7 @@ fn test_case_1809() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53511,6 +54520,7 @@ fn test_case_1810() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53557,6 +54567,7 @@ fn test_case_1811() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53603,6 +54614,7 @@ fn test_case_1812() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53649,6 +54661,7 @@ fn test_case_1813() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53695,6 +54708,7 @@ fn test_case_1814() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53741,6 +54755,7 @@ fn test_case_1815() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53787,6 +54802,7 @@ fn test_case_1816() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53833,6 +54849,7 @@ fn test_case_1817() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53879,6 +54896,7 @@ fn test_case_1818() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53925,6 +54943,7 @@ fn test_case_1819() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -53971,6 +54990,7 @@ fn test_case_1820() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54017,6 +55037,7 @@ fn test_case_1821() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54063,6 +55084,7 @@ fn test_case_1822() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54109,6 +55131,7 @@ fn test_case_1823() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54155,6 +55178,7 @@ fn test_case_1824() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54201,6 +55225,7 @@ fn test_case_1825() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54247,6 +55272,7 @@ fn test_case_1826() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54293,6 +55319,7 @@ fn test_case_1827() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54339,6 +55366,7 @@ fn test_case_1828() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54385,6 +55413,7 @@ fn test_case_1829() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54431,6 +55460,7 @@ fn test_case_1830() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54477,6 +55507,7 @@ fn test_case_1831() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54523,6 +55554,7 @@ fn test_case_1832() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54569,6 +55601,7 @@ fn test_case_1833() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54615,6 +55648,7 @@ fn test_case_1834() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54661,6 +55695,7 @@ fn test_case_1835() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54707,6 +55742,7 @@ fn test_case_1836() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54753,6 +55789,7 @@ fn test_case_1837() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54799,6 +55836,7 @@ fn test_case_1838() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54845,6 +55883,7 @@ fn test_case_1839() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54891,6 +55930,7 @@ fn test_case_1840() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54937,6 +55977,7 @@ fn test_case_1841() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -54983,6 +56024,7 @@ fn test_case_1842() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55029,6 +56071,7 @@ fn test_case_1843() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55075,6 +56118,7 @@ fn test_case_1844() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55121,6 +56165,7 @@ fn test_case_1845() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55167,6 +56212,7 @@ fn test_case_1846() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55213,6 +56259,7 @@ fn test_case_1847() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55259,6 +56306,7 @@ fn test_case_1848() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55305,6 +56353,7 @@ fn test_case_1849() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55351,6 +56400,7 @@ fn test_case_1850() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55397,6 +56447,7 @@ fn test_case_1851() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55443,6 +56494,7 @@ fn test_case_1852() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55489,6 +56541,7 @@ fn test_case_1853() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55535,6 +56588,7 @@ fn test_case_1854() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55581,6 +56635,7 @@ fn test_case_1855() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55627,6 +56682,7 @@ fn test_case_1856() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55673,6 +56729,7 @@ fn test_case_1857() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55719,6 +56776,7 @@ fn test_case_1858() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55765,6 +56823,7 @@ fn test_case_1859() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55811,6 +56870,7 @@ fn test_case_1860() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55857,6 +56917,7 @@ fn test_case_1861() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55903,6 +56964,7 @@ fn test_case_1862() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55949,6 +57011,7 @@ fn test_case_1863() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -55995,6 +57058,7 @@ fn test_case_1864() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56041,6 +57105,7 @@ fn test_case_1865() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56087,6 +57152,7 @@ fn test_case_1866() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56133,6 +57199,7 @@ fn test_case_1867() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56179,6 +57246,7 @@ fn test_case_1868() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56225,6 +57293,7 @@ fn test_case_1869() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56271,6 +57340,7 @@ fn test_case_1870() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56317,6 +57387,7 @@ fn test_case_1871() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56363,6 +57434,7 @@ fn test_case_1872() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56409,6 +57481,7 @@ fn test_case_1873() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56455,6 +57528,7 @@ fn test_case_1874() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56501,6 +57575,7 @@ fn test_case_1875() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56547,6 +57622,7 @@ fn test_case_1876() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56593,6 +57669,7 @@ fn test_case_1877() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56639,6 +57716,7 @@ fn test_case_1878() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56685,6 +57763,7 @@ fn test_case_1879() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56731,6 +57810,7 @@ fn test_case_1880() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56777,6 +57857,7 @@ fn test_case_1881() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56823,6 +57904,7 @@ fn test_case_1882() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56869,6 +57951,7 @@ fn test_case_1883() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56915,6 +57998,7 @@ fn test_case_1884() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -56961,6 +58045,7 @@ fn test_case_1885() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -57007,6 +58092,7 @@ fn test_case_1886() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -57053,6 +58139,7 @@ fn test_case_1887() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -57099,6 +58186,7 @@ fn test_case_1888() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -57145,6 +58233,7 @@ fn test_case_1889() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -57191,6 +58280,7 @@ fn test_case_1890() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -57237,6 +58327,7 @@ fn test_case_1891() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -57283,6 +58374,7 @@ fn test_case_1892() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -57329,6 +58421,7 @@ fn test_case_1893() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -57375,6 +58468,7 @@ fn test_case_1894() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -57421,6 +58515,7 @@ fn test_case_1895() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -57467,6 +58562,7 @@ fn test_case_1896() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -57513,6 +58609,7 @@ fn test_case_1897() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -57559,6 +58656,7 @@ fn test_case_1898() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -57605,6 +58703,7 @@ fn test_case_1899() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -57651,6 +58750,7 @@ fn test_case_1900() {
         model: None,
         temperature: None,
         enable_temporal_facts: false,
+        images: None,
     };
     let res = engine.evaluate(&req).unwrap();
     assert_eq!(
@@ -57689,6 +58789,7 @@ fn test_case_1901() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -57733,6 +58834,7 @@ fn test_case_1902() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -57777,6 +58879,7 @@ fn test_case_1903() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -57821,6 +58924,7 @@ fn test_case_1904() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -57865,6 +58969,7 @@ fn test_case_1905() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -57909,6 +59014,7 @@ fn test_case_1906() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -57953,6 +59059,7 @@ fn test_case_1907() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -57997,6 +59104,7 @@ fn test_case_1908() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58041,6 +59149,7 @@ fn test_case_1909() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58085,6 +59194,7 @@ fn test_case_1910() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58129,6 +59239,7 @@ fn test_case_1911() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58173,6 +59284,7 @@ fn test_case_1912() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58217,6 +59329,7 @@ fn test_case_1913() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58261,6 +59374,7 @@ fn test_case_1914() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58305,6 +59419,7 @@ fn test_case_1915() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58349,6 +59464,7 @@ fn test_case_1916() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58393,6 +59509,7 @@ fn test_case_1917() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58437,6 +59554,7 @@ fn test_case_1918() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58481,6 +59599,7 @@ fn test_case_1919() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58525,6 +59644,7 @@ fn test_case_1920() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58569,6 +59689,7 @@ fn test_case_1921() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58613,6 +59734,7 @@ fn test_case_1922() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58657,6 +59779,7 @@ fn test_case_1923() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58701,6 +59824,7 @@ fn test_case_1924() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58745,6 +59869,7 @@ fn test_case_1925() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58789,6 +59914,7 @@ fn test_case_1926() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58833,6 +59959,7 @@ fn test_case_1927() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58877,6 +60004,7 @@ fn test_case_1928() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58921,6 +60049,7 @@ fn test_case_1929() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -58965,6 +60094,7 @@ fn test_case_1930() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59009,6 +60139,7 @@ fn test_case_1931() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59053,6 +60184,7 @@ fn test_case_1932() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59097,6 +60229,7 @@ fn test_case_1933() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59141,6 +60274,7 @@ fn test_case_1934() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59185,6 +60319,7 @@ fn test_case_1935() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59229,6 +60364,7 @@ fn test_case_1936() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59273,6 +60409,7 @@ fn test_case_1937() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59317,6 +60454,7 @@ fn test_case_1938() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59361,6 +60499,7 @@ fn test_case_1939() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59405,6 +60544,7 @@ fn test_case_1940() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59449,6 +60589,7 @@ fn test_case_1941() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59493,6 +60634,7 @@ fn test_case_1942() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59537,6 +60679,7 @@ fn test_case_1943() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59581,6 +60724,7 @@ fn test_case_1944() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59625,6 +60769,7 @@ fn test_case_1945() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59669,6 +60814,7 @@ fn test_case_1946() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59713,6 +60859,7 @@ fn test_case_1947() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59757,6 +60904,7 @@ fn test_case_1948() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59801,6 +60949,7 @@ fn test_case_1949() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59845,6 +60994,7 @@ fn test_case_1950() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59889,6 +61039,7 @@ fn test_case_1951() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59933,6 +61084,7 @@ fn test_case_1952() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -59977,6 +61129,7 @@ fn test_case_1953() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60021,6 +61174,7 @@ fn test_case_1954() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60065,6 +61219,7 @@ fn test_case_1955() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60109,6 +61264,7 @@ fn test_case_1956() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60153,6 +61309,7 @@ fn test_case_1957() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60197,6 +61354,7 @@ fn test_case_1958() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60241,6 +61399,7 @@ fn test_case_1959() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60285,6 +61444,7 @@ fn test_case_1960() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60329,6 +61489,7 @@ fn test_case_1961() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60373,6 +61534,7 @@ fn test_case_1962() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60417,6 +61579,7 @@ fn test_case_1963() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60461,6 +61624,7 @@ fn test_case_1964() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60505,6 +61669,7 @@ fn test_case_1965() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60549,6 +61714,7 @@ fn test_case_1966() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60593,6 +61759,7 @@ fn test_case_1967() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60637,6 +61804,7 @@ fn test_case_1968() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60681,6 +61849,7 @@ fn test_case_1969() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60725,6 +61894,7 @@ fn test_case_1970() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60769,6 +61939,7 @@ fn test_case_1971() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60813,6 +61984,7 @@ fn test_case_1972() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60857,6 +62029,7 @@ fn test_case_1973() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60901,6 +62074,7 @@ fn test_case_1974() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60945,6 +62119,7 @@ fn test_case_1975() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -60989,6 +62164,7 @@ fn test_case_1976() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61033,6 +62209,7 @@ fn test_case_1977() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61077,6 +62254,7 @@ fn test_case_1978() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61121,6 +62299,7 @@ fn test_case_1979() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61165,6 +62344,7 @@ fn test_case_1980() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61209,6 +62389,7 @@ fn test_case_1981() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61253,6 +62434,7 @@ fn test_case_1982() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61297,6 +62479,7 @@ fn test_case_1983() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61341,6 +62524,7 @@ fn test_case_1984() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61385,6 +62569,7 @@ fn test_case_1985() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61429,6 +62614,7 @@ fn test_case_1986() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61473,6 +62659,7 @@ fn test_case_1987() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61517,6 +62704,7 @@ fn test_case_1988() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61561,6 +62749,7 @@ fn test_case_1989() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61605,6 +62794,7 @@ fn test_case_1990() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61649,6 +62839,7 @@ fn test_case_1991() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61693,6 +62884,7 @@ fn test_case_1992() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61737,6 +62929,7 @@ fn test_case_1993() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61781,6 +62974,7 @@ fn test_case_1994() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61825,6 +63019,7 @@ fn test_case_1995() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61869,6 +63064,7 @@ fn test_case_1996() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61913,6 +63109,7 @@ fn test_case_1997() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -61957,6 +63154,7 @@ fn test_case_1998() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -62001,6 +63199,7 @@ fn test_case_1999() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(
@@ -62045,6 +63244,7 @@ fn test_case_2000() {
                 model: None,
                 temperature: None,
                 enable_temporal_facts: false,
+                images: None,
             };
             let res = eng.evaluate(&req).unwrap();
             assert_eq!(

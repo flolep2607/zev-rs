@@ -52,6 +52,7 @@ fn bench_intent_routing(engine: &ZevEngine, iterations: usize) -> f64 {
         )]
         .into(),
         model: None,
+        images: None,
         temperature: None,
         enable_temporal_facts: false,
     };
@@ -94,6 +95,7 @@ fn bench_scale_options(engine: &ZevEngine, num_options: usize, iterations: usize
         )]
         .into(),
         model: None,
+        images: None,
         temperature: None,
         enable_temporal_facts: false,
     };

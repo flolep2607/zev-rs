@@ -100,6 +100,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
              \x20       model: None,\n\
              \x20       temperature: None,\n\
              \x20       enable_temporal_facts: false,\n\
+             \x20       images: None,\n\
              \x20   }};\n\
              \x20   let res = engine.evaluate(&req).unwrap();\n\
              \x20   assert_eq!(res.answers[\"selection\"].decision.as_ref().and_then(|v| v.as_str()), Some(\"server_route_{target_idx}\"));\n\
@@ -137,6 +138,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
              \x20       model: None,\n\
              \x20       temperature: None,\n\
              \x20       enable_temporal_facts: false,\n\
+             \x20       images: None,\n\
              \x20   }};\n\
              \x20   let res = engine.evaluate(&req).unwrap();\n\
              \x20   assert_eq!(res.answers[\"root_cause\"].decision.as_ref().and_then(|v| v.as_str()), Some(\"{target_id}\"));\n\
@@ -168,6 +170,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
              \x20       model: None,\n\
              \x20       temperature: None,\n\
              \x20       enable_temporal_facts: false,\n\
+             \x20       images: None,\n\
              \x20   }};\n\
              \x20   let res = engine.evaluate(&req).unwrap();\n\
              \x20   assert_eq!(res.answers.len(), {num_q});\n\
@@ -203,6 +206,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
              \x20       model: None,\n\
              \x20       temperature: None,\n\
              \x20       enable_temporal_facts: false,\n\
+             \x20       images: None,\n\
              \x20   }};\n\
              \x20   let res1 = engine.evaluate(&req1).unwrap();\n\
              \x20   let mut rev_options = base_options;\n\
@@ -218,6 +222,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
              \x20       model: None,\n\
              \x20       temperature: None,\n\
              \x20       enable_temporal_facts: false,\n\
+             \x20       images: None,\n\
              \x20   }};\n\
              \x20   let res2 = engine.evaluate(&req2).unwrap();\n\
              \x20   assert_eq!(res1.answers[\"decision\"].decision, res2.answers[\"decision\"].decision);\n\
@@ -368,6 +373,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
              \x20       model: None,\n\
              \x20       temperature: None,\n\
              \x20       enable_temporal_facts: false,\n\
+             \x20       images: None,\n\
              \x20   }};\n\
              \x20   let res = engine.evaluate(&req).unwrap();\n\
              \x20   assert_eq!(res.answers[\"matched\"].decision.as_ref().and_then(|v| v.as_str()), Some(\"application\"));\n\
