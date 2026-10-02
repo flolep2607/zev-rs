@@ -90,7 +90,29 @@ pub enum Proj {
     },
 }
 
+/// A projection's input: bf16, or int8 rows with one scale each, written so by the kernel that produced them
+/// (kernels::add_norm_q8, act_mul_q8, gated_norm_q8) for a KEV_W8=int8 projection.
+pub enum In {
+    T(Tensor),
+    Q(Tensor, Tensor),
+}
+
 impl Proj {
+    /// Whether this projection takes int8 rows directly (In::Q).
+    fn takes_q8(&self) -> bool {
+        matches!(self, Proj::W8 { mode: 1, .. })
+    }
+    fn forward_in(&self, x: &In) -> Result<Tensor> {
+        match x {
+            In::T(t) => self.forward(t),
+            In::Q(xq, sx) => {
+                let Proj::W8 { q, s, out, inn, mode } = self else {
+                    candle_core::bail!("int8 rows given to a projection that is not KEV_W8=int8")
+                };
+                kernels::gemm_w8(xq, sx, q, s, xq.dim(0)?, *out, *inn, *mode)
+            }
+        }
+    }
     pub fn forward(&self, x: &Tensor) -> Result<Tensor> {
         match self {
             Proj::Dense(w) => x.matmul(&w.t()?),
@@ -971,35 +993,51 @@ impl Model {
         if let Some(s) = self.embed_scale {
             x = (x * s)?;
         }
-        let mut h = kernels::add_norm(&x, None, Some(&self.layers[0].in_norm), eps, mode, 1.0)?.1;
+        let mut h = if mixer_in(&self.layers[0].mixer).takes_q8() {
+            let (_, q, s) = kernels::add_norm_q8(&x, None, Some(&self.layers[0].in_norm), eps, mode, 1.0)?;
+            In::Q(q, s)
+        } else {
+            In::T(kernels::add_norm(&x, None, Some(&self.layers[0].in_norm), eps, mode, 1.0)?.1)
+        };
         let picks_t = Tensor::new(picks, &self.dev)?;
         let nl = self.layers.len();
         for (i, l) in self.layers.iter().enumerate() {
             let last = i + 1 == nl;
-            let Some(core) = self.mixer(&l.mixer, &h, pack, last && picks.is_empty())? else {
+            let Some(core) = self.mixer(&l.mixer, &h, pack, last && picks.is_empty(), !last)? else {
                 break;
             };
             let (core, xr) = if last {
+                let In::T(core) = core else { unreachable!("the last layer's mixer output stays bf16") };
                 (
-                    core.index_select(&picks_t, 0)?,
+                    In::T(core.index_select(&picks_t, 0)?),
                     x.index_select(&picks_t, 0)?,
                 )
             } else {
                 (core, x)
             };
             let mut mixed = match &l.mixer {
-                Mixer::Gdn(g) => g.out.forward(&core)?,
-                Mixer::Attn(a) => a.o.forward(&core)?,
+                Mixer::Gdn(g) => g.out.forward_in(&core)?,
+                Mixer::Attn(a) => a.o.forward_in(&core)?,
             };
             if let Some(w) = &l.post_mix {
                 mixed = kernels::add_norm(&mixed, None, Some(w), eps, mode, 1.0)?.1;
             }
-            let (xn, hn) = kernels::add_norm(&xr, Some(&mixed), Some(&l.pre_mlp), eps, mode, 1.0)?;
-            let mut m = l.down.forward(&kernels::act_mul(
-                &l.gate_up.forward(&hn)?,
-                self.act,
-                self.round_act,
-            )?)?;
+            let (xn, hn) = if l.gate_up.takes_q8() {
+                let (xn, q, s) = kernels::add_norm_q8(&xr, Some(&mixed), Some(&l.pre_mlp), eps, mode, 1.0)?;
+                (xn, In::Q(q, s))
+            } else {
+                let (xn, hn) = kernels::add_norm(&xr, Some(&mixed), Some(&l.pre_mlp), eps, mode, 1.0)?;
+                (xn, In::T(hn))
+            };
+            let gu = l.gate_up.forward_in(&hn)?;
+            let act = if l.down.takes_q8() {
+                let (q, s) = kernels::act_mul_q8(&gu, self.act, self.round_act)?;
+                In::Q(q, s)
+            } else {
+                In::T(kernels::act_mul(&gu, self.act, self.round_act)?)
+            };
+            drop(gu);
+            let mut m = l.down.forward_in(&act)?;
             if let Some(w) = &l.post_mlp {
                 m = kernels::add_norm(&m, None, Some(w), eps, mode, 1.0)?.1;
             }
@@ -1008,42 +1046,63 @@ impl Model {
             } else {
                 &self.layers[i + 1].in_norm
             };
-            let (xn2, hn2) = kernels::add_norm(&xn, Some(&m), Some(next), eps, mode, l.scalar)?;
             if last {
+                let (_, hn2) = kernels::add_norm(&xn, Some(&m), Some(next), eps, mode, l.scalar)?;
                 return hn2.to_dtype(DType::F32);
             }
+            let (xn2, hn2) = if mixer_in(&self.layers[i + 1].mixer).takes_q8() {
+                let (xn2, q, s) = kernels::add_norm_q8(&xn, Some(&m), Some(next), eps, mode, l.scalar)?;
+                (xn2, In::Q(q, s))
+            } else {
+                let (xn2, hn2) = kernels::add_norm(&xn, Some(&m), Some(next), eps, mode, l.scalar)?;
+                (xn2, In::T(hn2))
+            };
             x = xn2;
             h = hn2;
         }
         Tensor::zeros((0, self.hidden), DType::F32, &self.dev)
     }
 
+    /// The mixer's output for its output projection: int8 rows when `q8_out` and that projection takes them.
     fn mixer(
         &self,
         m: &Mixer,
-        h: &Tensor,
+        h: &In,
         pack: &Pack,
         cache_only: bool,
-    ) -> Result<Option<Tensor>> {
+        q8_out: bool,
+    ) -> Result<Option<In>> {
         Ok(match m {
             Mixer::Gdn(g) => {
-                let p = g.proj.forward(h)?;
-                let qkv = kernels::conv(&p, &g.conv_w, pack, &g.spec, g.lg)?;
-                let o = kernels::gdn(&qkv, &p, &g.a_neg, &g.dt_bias, pack, &g.spec, g.lg)?;
+                let p = g.proj.forward_in(h)?;
+                let o = kernels::conv_gdn(&p, &g.conv_w, &g.a_neg, &g.dt_bias, pack, &g.spec, g.lg)?;
                 if cache_only {
                     return Ok(None);
                 }
-                Some(kernels::gated_norm(&o, &p, &g.norm_w, &g.spec)?)
+                if q8_out && g.out.takes_q8() {
+                    let (q, s) = kernels::gated_norm_q8(&o, &p, &g.norm_w, &g.spec)?;
+                    Some(In::Q(q, s))
+                } else {
+                    Some(In::T(kernels::gated_norm(&o, &p, &g.norm_w, &g.spec)?))
+                }
             }
             Mixer::Attn(a) => {
-                let p = a.qkv.forward(h)?;
+                let p = a.qkv.forward_in(h)?;
                 let (q, k, v) = kernels::qkv_prep(&p, pack, &a.spec)?;
                 if cache_only {
                     return Ok(None);
                 }
-                Some(kernels::attention(&q, &k, &v, &p, pack, &a.spec)?)
+                Some(In::T(kernels::attention(&q, &k, &v, &p, pack, &a.spec)?))
             }
         })
+    }
+}
+
+/// The projection a mixer's input goes through first.
+fn mixer_in(m: &Mixer) -> &Proj {
+    match m {
+        Mixer::Gdn(g) => &g.proj,
+        Mixer::Attn(a) => &a.qkv,
     }
 }
 

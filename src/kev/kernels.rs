@@ -817,6 +817,48 @@ fn rounder(dt: DType) -> fn(f32) -> f32 {
     }
 }
 
+/// add_norm with the normalized rows as int8 + one scale each, for a KEV_W8=int8 projection: (xo, q, s).
+pub fn add_norm_q8(x: &Tensor, m: Option<&Tensor>, w: Option<&Tensor>, eps: f64, mode: NormMode, scale: f64) -> Result<(Tensor, Tensor, Tensor)> {
+    #[cfg(feature = "cuda")]
+    if is_cuda(x) {
+        return cu::add_norm_q8(x, m, w, eps, mode, scale);
+    }
+    let _ = (x, m, w, eps, mode, scale);
+    candle_core::bail!("KEV_W8 needs a CUDA device")
+}
+
+/// act_mul with the result as int8 rows + one scale each, for a KEV_W8=int8 projection: (q, s).
+pub fn act_mul_q8(gu: &Tensor, act: Act, round_act: bool) -> Result<(Tensor, Tensor)> {
+    #[cfg(feature = "cuda")]
+    if is_cuda(gu) {
+        return cu::act_mul_q8(gu, act, round_act);
+    }
+    let _ = (gu, act, round_act);
+    candle_core::bail!("KEV_W8 needs a CUDA device")
+}
+
+/// gated_norm with each token's output as int8 + one scale, for a KEV_W8=int8 projection: (q, s).
+pub fn gated_norm_q8(o: &Tensor, p: &Tensor, w: &Tensor, g: &GdnSpec) -> Result<(Tensor, Tensor)> {
+    #[cfg(feature = "cuda")]
+    if is_cuda(o) {
+        return cu::gated_norm_q8(o, p, w, g);
+    }
+    let _ = (o, p, w, g);
+    candle_core::bail!("KEV_W8 needs a CUDA device")
+}
+
+/// The DeltaNet mixer's conv and gated delta rule in one call: on CUDA bf16 the fused conv_prep path (conv_gdn in
+/// kernels.cu terms), else conv() then gdn().
+#[allow(clippy::too_many_arguments)]
+pub fn conv_gdn(p: &Tensor, w: &Tensor, a_neg: &Tensor, dt_bias: &Tensor, pack: &Pack, g: &GdnSpec, lg: usize) -> Result<Tensor> {
+    #[cfg(feature = "cuda")]
+    if is_cuda(p) && p.dtype() == DType::BF16 && g.hk <= 16 {
+        return cu::conv_gdn(p, w, a_neg, dt_bias, pack, g, lg);
+    }
+    let qkv = conv(p, w, pack, g, lg)?;
+    gdn(&qkv, p, a_neg, dt_bias, pack, g, lg)
+}
+
 /// KEV_W8 quantizes the layer projections to 8 bits (W8A8): "fp8" (e4m3, per channel and per token; Ada and later),
 /// "fp8t" (e4m3, one scale per tensor) or "int8" (per channel and per token; Turing and later).
 pub fn w8_mode() -> Option<i32> {
@@ -1351,6 +1393,100 @@ mod cu {
         Ok(o)
     }
 
+    /// conv + gdn for bf16 in three kernels: conv_tail (the conv cache), conv_prep_bf16 (conv, SiLU, q/k norms, gates)
+    /// and gdn_fast_bf16. The bf16 q|k|v row conv() writes is never materialized.
+    #[allow(clippy::too_many_arguments)]
+    pub fn conv_gdn(p: &Tensor, w: &Tensor, a_neg: &Tensor, dt_bias: &Tensor, pack: &Pack, g: &GdnSpec, lg: usize) -> Result<Tensor> {
+        let c = g.c();
+        let m = meta(pack);
+        conv_tail(p, pack, g, lg, m)?;
+        let n = pack.n;
+        let (qn, pq) = out(p, &[n, g.hk * DK], DType::F32)?;
+        let (kn, pk) = out(p, &[n, g.hk * DK], DType::F32)?;
+        let (vo, pv) = out(p, &[n, g.hv * DV], DType::BF16)?;
+        let (gate, pg) = out(p, &[n, g.hv, 2], DType::F32)?;
+        launch(
+            p,
+            "conv_prep_bf16",
+            (n as u32, 1, 1),
+            512,
+            0,
+            &[
+                A::P(ptr(p)?),
+                A::I(g.ld as i32),
+                A::P(ptr(w)?),
+                A::I(g.k as i32),
+                A::P(m.u(0)?),
+                A::P(m.u(m.o_cu)?),
+                A::P(m.p(0)?),
+                A::I(lg as i32),
+                A::I(g.a_off() as i32),
+                A::I(g.b_off() as i32),
+                A::P(ptr(a_neg)?),
+                A::P(ptr(dt_bias)?),
+                A::P(pq),
+                A::P(pk),
+                A::P(pv),
+                A::P(pg),
+                A::I(g.hk as i32),
+                A::I(g.hv as i32),
+            ],
+        )?;
+        let (o, po) = out(p, &[n, g.hv * DV], DType::F32)?;
+        for (list, off) in [(&pack.tier0, m.o_t0), (&pack.tier1, m.o_t1)] {
+            launch(
+                p,
+                "gdn_fast_bf16",
+                ((g.hv * DV / 8 / 4) as u32, list.len() as u32, 1),
+                128,
+                0,
+                &[
+                    A::P(pv),
+                    A::I((g.hv * DV) as i32),
+                    A::P(pq),
+                    A::P(pk),
+                    A::P(pg),
+                    A::P(po),
+                    A::P(m.u(m.o_cu)?),
+                    A::P(m.u(off)?),
+                    A::P(m.p(1)?),
+                    A::P(m.p(5)?),
+                    A::I(g.hk as i32),
+                    A::I(g.hv as i32),
+                    A::I(lg as i32),
+                ],
+            )?;
+        }
+        drop((qn, kn, vo, gate));
+        let _ = c;
+        Ok(o)
+    }
+
+    fn conv_tail(p: &Tensor, pack: &Pack, g: &GdnSpec, lg: usize, m: &Meta) -> Result<()> {
+        let dt = p.dtype();
+        let c = g.c();
+        let tail = pack.tier0.len() * (g.k - 1) * c;
+        launch(
+            p,
+            kname!("conv_tail", dt),
+            (tail.div_ceil(256) as u32, 1, 1),
+            256,
+            0,
+            &[
+                A::P(ptr(p)?),
+                A::I(g.ld as i32),
+                A::I(c as i32),
+                A::I(g.k as i32),
+                A::P(m.u(m.o_cu)?),
+                A::P(m.u(m.o_t0)?),
+                A::L(tail as i64),
+                A::P(m.p(0)?),
+                A::P(m.p(4)?),
+                A::I(lg as i32),
+            ],
+        )
+    }
+
     pub fn conv(p: &Tensor, w: &Tensor, pack: &Pack, g: &GdnSpec, lg: usize) -> Result<Tensor> {
         let dt = p.dtype();
         let c = g.c();
@@ -1449,7 +1585,8 @@ mod cu {
                     128,
                     0,
                     &[
-                        A::P(ptr(qkv)?),
+                        A::P(ptr(qkv)? + (2 * g.hk * DK * 2) as u64),
+                        A::I(g.c() as i32),
                         A::P(pq),
                         A::P(pk),
                         A::P(pg),
@@ -1495,6 +1632,84 @@ mod cu {
         }
         let _ = DK;
         Ok(o)
+    }
+
+    pub fn add_norm_q8(x: &Tensor, m: Option<&Tensor>, w: Option<&Tensor>, eps: f64, mode: NormMode, scale: f64) -> Result<(Tensor, Tensor, Tensor)> {
+        let (n, h) = x.dims2()?;
+        if x.dtype() != DType::BF16 || h > 256 * 16 {
+            candle_core::bail!("add_norm_q8: bf16 rows of at most 4096");
+        }
+        let (q, pq) = out(x, &[n, h], DType::U8)?;
+        let (s, ps) = out(x, &[n], DType::F32)?;
+        let (xo, pxo) = match m {
+            Some(_) => out(x, &[n, h], DType::BF16)?,
+            None => (x.clone(), 0),
+        };
+        launch(
+            x,
+            "add_norm_q8_bf16",
+            (n as u32, 1, 1),
+            256,
+            0,
+            &[
+                A::P(ptr(x)?),
+                A::P(opt(m)?),
+                A::P(opt(w)?),
+                A::P(pxo),
+                A::P(pq),
+                A::P(ps),
+                A::I(h as i32),
+                A::F(eps as f32),
+                A::I((mode == NormMode::Rounded) as i32),
+                A::F(scale as f32),
+            ],
+        )?;
+        Ok((xo, q, s))
+    }
+    pub fn act_mul_q8(gu: &Tensor, act: Act, round_act: bool) -> Result<(Tensor, Tensor)> {
+        let (n, i2) = gu.dims2()?;
+        let i = i2 / 2;
+        if gu.dtype() != DType::BF16 || i > 512 * 24 {
+            candle_core::bail!("act_mul_q8: bf16 rows of at most 2 x 12288");
+        }
+        let (q, pq) = out(gu, &[n, i], DType::U8)?;
+        let (s, ps) = out(gu, &[n], DType::F32)?;
+        launch(
+            gu,
+            "act_mul_q8_bf16",
+            (n as u32, 1, 1),
+            512,
+            0,
+            &[A::P(ptr(gu)?), A::P(pq), A::P(ps), A::I(i as i32), A::I((act == Act::GeluTanh) as i32), A::I(round_act as i32)],
+        )?;
+        Ok((q, s))
+    }
+    pub fn gated_norm_q8(o: &Tensor, p: &Tensor, w: &Tensor, g: &GdnSpec) -> Result<(Tensor, Tensor)> {
+        let n = o.dim(0)?;
+        if p.dtype() != DType::BF16 || g.hv * 32 > 1024 {
+            candle_core::bail!("gated_norm_q8: bf16, at most 32 value heads");
+        }
+        let (q, pq) = out(p, &[n, g.hv * DV], DType::U8)?;
+        let (s, ps) = out(p, &[n], DType::F32)?;
+        launch(
+            p,
+            "gated_norm_q8_bf16",
+            (n as u32, 1, 1),
+            (g.hv * 32) as u32,
+            0,
+            &[
+                A::P(ptr(o)?),
+                A::P(ptr(p)?),
+                A::I(g.ld as i32),
+                A::I(g.z_off() as i32),
+                A::P(ptr(w)?),
+                A::P(pq),
+                A::P(ps),
+                A::I(g.hv as i32),
+                A::F(g.eps as f32),
+            ],
+        )?;
+        Ok((q, s))
     }
 
     pub fn gated_norm(o: &Tensor, p: &Tensor, w: &Tensor, g: &GdnSpec, n: usize) -> Result<Tensor> {

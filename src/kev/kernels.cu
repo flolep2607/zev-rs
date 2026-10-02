@@ -566,13 +566,13 @@ __device__ __forceinline__ void cpa8(void* dst, const void* src) {
 
 // grid (HV * DV / 8 / GF_W, listed sequences), block 32 * GF_W. Warp w owns value columns [8 tile, 8 tile + 8) of
 // head h; lane = column (lane / 4) x key slice (lane % 4) holding keys 32 ks .. 32 ks + 31. rd / wr as gdn_body.
-extern "C" __global__ void __launch_bounds__(32 * GF_W) gdn_fast_bf16(const bf16* qkv, const float* qn, const float* kn,
+// v_in is the first value column of row 0, vld its row stride (conv_bf16's q|k|v rows, or conv_prep_bf16's v rows).
+extern "C" __global__ void __launch_bounds__(32 * GF_W) gdn_fast_bf16(const bf16* v_in, int vld, const float* qn, const float* kn,
         const float* gate, float* out, const u32* cu, const u32* list, const u64* rd, const u64* wr, int HK, int HV, int lg) {
     constexpr int TPH = DV / 8 / GF_W;
     const int h = blockIdx.x / TPH, w = threadIdx.x >> 5, lane = threadIdx.x & 31, tid = threadIdx.x;
     const int tile = (blockIdx.x % TPH) * GF_W + w, col = lane >> 2, ks = lane & 3, j = tile * 8 + col, kh = h / (HV / HK);
     const int jb = (blockIdx.x % TPH) * GF_W * 8;
-    const int C = 2 * HK * DK + HV * DV;
     const u32 b = list[blockIdx.y];
     const long start = cu[b];
     const int len = cu[b + 1] - start;
@@ -592,7 +592,7 @@ extern "C" __global__ void __launch_bounds__(32 * GF_W) gdn_fast_bf16(const bf16
         }
         for (int e = tid; e < n * GF_W; e += 32 * GF_W) {  // v: the block's 8 GF_W columns, 8 per chunk
             const int i = e / GF_W, c8 = e % GF_W;
-            cpa16(&vv[buf][i][8 * c8], qkv + (start + t0 + i) * C + 2 * HK * DK + h * DV + jb + 8 * c8);
+            cpa16(&vv[buf][i][8 * c8], v_in + (start + t0 + i) * vld + h * DV + jb + 8 * c8);
         }
         for (int i = tid; i < n; i += 32 * GF_W) cpa8(&gg[buf][i][0], gate + 2 * ((start + t0 + i) * HV + h));
         asm volatile("cp.async.commit_group;");
@@ -643,6 +643,55 @@ extern "C" __global__ void __launch_bounds__(32 * GF_W) gdn_fast_bf16(const bf16
         float* st = (float*)wr[b] + soff;
 #pragma unroll
         for (int r = 0; r < 32; r++) st[(long)(32 * ks + r) * DV] = S[r];
+    }
+}
+
+
+// DeltaNet conv1d + SiLU fused with gdn_prep_bf16: one block of 512 per token writes what gdn_fast_bf16 reads (qn, kn
+// f32, v bf16 [T, HV DV], gates) instead of the bf16 q|k|v row that conv_bf16 wrote and gdn_prep_bf16 read back. Each
+// value is the one the unfused pair computes: the conv output rounded to bf16 first.
+extern "C" __global__ void __launch_bounds__(512) conv_prep_bf16(const bf16* p, int ld, const float* w, int K, const u32* tok2seq, const u32* cu,
+        const u64* rd, int lg, int a_off, int b_off, const float* a_neg, const float* dt_bias, float* qn, float* kn, bf16* vo, float* gate,
+        int HK, int HV) {
+    const long tok = blockIdx.x;
+    const u32 b = tok2seq[tok];
+    const long start = cu[b], t = tok - start;
+    const int C = 2 * HK * DK + HV * DV;
+    const bf16* prev = rd[b] ? (const bf16*)rd[b] + (long)lg * (K - 1) * C : nullptr;
+    auto convc = [&](int c) {
+        float acc = 0.f;
+        for (int k = 0; k < K; k++) {
+            const long tau = t - (K - 1) + k;
+            const float x = tau >= 0 ? bf2f(p[(start + tau) * ld + c]) : (prev ? bf2f(prev[(K - 1 + tau) * C + c]) : 0.f);
+            acc += w[k * C + c] * x;
+        }
+        acc = rnd<bf16>(acc);
+        return bf2f(f2bf(acc / (1.f + expf(-acc))));
+    };
+    const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31;
+    for (int kh = warp; kh < HK; kh += 16) {
+        float q[4], k[4], sq = 0.f, sk = 0.f;
+#pragma unroll
+        for (int r = 0; r < 4; r++) {
+            q[r] = convc(kh * DK + lane + 32 * r);
+            k[r] = convc(HK * DK + kh * DK + lane + 32 * r);
+            sq += q[r] * q[r];
+            sk += k[r] * k[r];
+        }
+        const float iq = rsqrtf(warp_sum(sq) + 1e-6f) * rsqrtf((float)DK), ik = rsqrtf(warp_sum(sk) + 1e-6f);
+        const long o = (tok * HK + kh) * DK;
+#pragma unroll
+        for (int r = 0; r < 4; r++) {
+            qn[o + lane + 32 * r] = q[r] * iq;
+            kn[o + lane + 32 * r] = k[r] * ik;
+        }
+    }
+    for (int c = threadIdx.x; c < HV * DV; c += 512) vo[tok * HV * DV + c] = f2bf(convc(2 * HK * DK + c));
+    for (int h = threadIdx.x; h < HV; h += 512) {
+        const float x = bf2f(p[tok * ld + a_off + h]) + dt_bias[h];
+        const float sp = fmaxf(x, 0.f) + logf(1.f + expf(-fabsf(x)));
+        gate[2 * (tok * HV + h)] = expf(sp * a_neg[h]);
+        gate[2 * (tok * HV + h) + 1] = 1.f / (1.f + expf(-bf2f(p[tok * ld + b_off + h])));
     }
 }
 
@@ -1422,4 +1471,112 @@ extern "C" __global__ void __launch_bounds__(256) rescale_i32(const int* acc, co
         f[4] = v1.x * a * w1.x; f[5] = v1.y * a * w1.y; f[6] = v1.z * a * w1.z; f[7] = v1.w * a * w1.w;
         st8(yr + i, f);
     }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Producers that write a KEV_W8=int8 projection's input directly as int8 rows with one scale each (amax / 127),
+// fusing quant_rows away: the bf16 row is never written or re-read. Each quantizes exactly the value the bf16 path
+// would store (rounded to bf16 first), so the result is bit-identical to producer + quant_rows.
+// ---------------------------------------------------------------------------------------------------------------
+__device__ float block_max_all(float v) {  // max over the block (blockDim.x a multiple of 32); every thread gets it
+    __shared__ float part[32];
+    v = warp_max(v);
+    const int w = threadIdx.x >> 5, l = threadIdx.x & 31, nw = blockDim.x >> 5;
+    __syncthreads();
+    if (l == 0) part[w] = v;
+    __syncthreads();
+    v = l < nw ? part[l] : 0.f;
+    return warp_max(v);
+}
+__device__ __forceinline__ signed char q127(float v, float inv) { return (signed char)max(-127, min(127, __float2int_rn(v * inv))); }
+
+// add_norm_bf16 (block of 256 per token, H <= 256 * QN_MAX) with the normalized row as int8 + scale instead of bf16.
+#define QN_MAX 16
+extern "C" __global__ void __launch_bounds__(256) add_norm_q8_bf16(const bf16* x, const bf16* m, const float* w, bf16* xo, signed char* q,
+                                                                   float* qs, int H, float eps, int rounded, float scale) {
+    const long row = (long)blockIdx.x * H;
+    float sv[QN_MAX], ss = 0.f;
+#pragma unroll
+    for (int k = 0; k < QN_MAX; k++) {
+        const int i = threadIdx.x + 256 * k;
+        sv[k] = i < H ? residual(x, m, row + i, scale) : 0.f;
+        ss += sv[k] * sv[k];
+    }
+    ss = block_sum(ss);
+    const float r = rsqrtf(ss / H + eps);
+    float amax = 0.f;
+#pragma unroll
+    for (int k = 0; k < QN_MAX; k++) {
+        const int i = threadIdx.x + 256 * k;
+        if (i < H) {
+            if (m) stf(xo, row + i, sv[k]);
+            const float wi = w ? w[i] : 1.f;
+            sv[k] = bf2f(f2bf(rounded ? rnd<bf16>(sv[k] * r) * wi : sv[k] * r * wi));
+            amax = fmaxf(amax, fabsf(sv[k]));
+        }
+    }
+    amax = block_max_all(amax);
+    const float sc = amax > 0.f ? amax / 127.f : 1.f, inv = 1.f / sc;
+    if (threadIdx.x == 0) qs[blockIdx.x] = sc;
+#pragma unroll
+    for (int k = 0; k < QN_MAX; k++) {
+        const int i = threadIdx.x + 256 * k;
+        if (i < H) q[row + i] = q127(sv[k], inv);
+    }
+}
+
+// act_mul_bf16 as one block of 512 per token (I <= 512 * AQ_MAX), writing act(gate) * up as int8 + scale.
+#define AQ_MAX 24
+extern "C" __global__ void __launch_bounds__(512) act_mul_q8_bf16(const bf16* gu, signed char* q, float* qs, int I, int gelu, int round_act) {
+    const long t = blockIdx.x;
+    float av[AQ_MAX], amax = 0.f;
+#pragma unroll
+    for (int k = 0; k < AQ_MAX; k++) {
+        const int i = threadIdx.x + 512 * k;
+        av[k] = 0.f;
+        if (i < I) {
+            const float g = bf2f(gu[t * 2 * I + i]), u = bf2f(gu[t * 2 * I + I + i]);
+            float a = gelu ? 0.5f * g * (1.f + tanhf(0.7978845608028654f * (g + 0.044715f * g * g * g))) : g / (1.f + expf(-g));
+            if (round_act) a = rnd<bf16>(a);
+            av[k] = bf2f(f2bf(a * u));
+            amax = fmaxf(amax, fabsf(av[k]));
+        }
+    }
+    amax = block_max_all(amax);
+    const float sc = amax > 0.f ? amax / 127.f : 1.f, inv = 1.f / sc;
+    if (threadIdx.x == 0) qs[t] = sc;
+#pragma unroll
+    for (int k = 0; k < AQ_MAX; k++) {
+        const int i = threadIdx.x + 512 * k;
+        if (i < I) q[t * I + i] = q127(av[k], inv);
+    }
+}
+
+// gated_norm_bf16 as one block per token, warp h = value head h (blockDim = 32 HV <= 1024), writing the token's
+// HV * DV outputs as int8 + one scale.
+extern "C" __global__ void __launch_bounds__(1024) gated_norm_q8_bf16(const float* o, const bf16* p, int ld, int z_off, const float* w,
+                                                                      signed char* q, float* qs, int HV, float eps) {
+    const long tok = blockIdx.x;
+    const int h = threadIdx.x >> 5, lane = threadIdx.x & 31;
+    const float* x = o + (tok * HV + h) * DV;
+    float v[4], ss = 0.f;
+#pragma unroll
+    for (int i = 0; i < 4; i++) {
+        v[i] = x[lane + 32 * i];
+        ss += v[i] * v[i];
+    }
+    const float r = rsqrtf(warp_sum(ss) / DV + eps);
+    float amax = 0.f;
+#pragma unroll
+    for (int i = 0; i < 4; i++) {
+        const int d = lane + 32 * i;
+        const float z = bf2f(p[tok * ld + z_off + (long)h * DV + d]);
+        v[i] = bf2f(f2bf(v[i] * r * w[d] * (z / (1.f + expf(-z)))));
+        amax = fmaxf(amax, fabsf(v[i]));
+    }
+    amax = block_max_all(amax);
+    const float sc = amax > 0.f ? amax / 127.f : 1.f, inv = 1.f / sc;
+    if (threadIdx.x == 0) qs[tok] = sc;
+#pragma unroll
+    for (int i = 0; i < 4; i++) q[(tok * HV + h) * DV + lane + 32 * i] = q127(v[i], inv);
 }
