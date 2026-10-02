@@ -1630,11 +1630,67 @@ mod cu {
         Ok((q, s))
     }
 
+    unsafe extern "C" {
+        // csrc/w8_gemm.cu: y [M, N] bf16 = (xq [M, K] i8 . wq [N, K]^T i8) * sx[m] * sw[n]; 0 on success
+        fn kev_w8_gemm_i8(
+            xq: *const std::ffi::c_void,
+            wq: *const std::ffi::c_void,
+            sx: *const f32,
+            sw: *const f32,
+            y: *mut std::ffi::c_void,
+            m: i32,
+            n: i32,
+            k: i32,
+            tile: i32,
+            stream: *mut std::ffi::c_void,
+        ) -> i32;
+    }
+
+    /// KEV_W8_TILE picks the CUTLASS tile (see csrc/w8_gemm.cu); KEV_W8_LT=1 sends int8 through cuBLASLt instead.
+    fn w8_env() -> (i32, bool) {
+        static ENV: std::sync::OnceLock<(i32, bool)> = std::sync::OnceLock::new();
+        *ENV.get_or_init(|| {
+            let tile = std::env::var("KEV_W8_TILE").ok().and_then(|t| t.parse().ok()).unwrap_or(0);
+            (tile, std::env::var("KEV_W8_LT").is_ok_and(|v| v == "1"))
+        })
+    }
+
+    /// int8 through the CUTLASS kernel, scales in its epilogue: no int32 round trip, no rescale pass.
+    #[allow(clippy::too_many_arguments)]
+    fn gemm_i8_fused(xq: &Tensor, sx: &Tensor, wq: &Tensor, sw: &Tensor, m: usize, n: usize, k: usize, tile: i32) -> Result<Tensor> {
+        let candle_core::Device::Cuda(d) = xq.device() else {
+            unreachable!()
+        };
+        let (y, yp) = out(xq, &[m, n], DType::BF16)?;
+        let code = unsafe {
+            kev_w8_gemm_i8(
+                ptr(xq)? as *const std::ffi::c_void,
+                ptr(wq)? as *const std::ffi::c_void,
+                ptr(sx)? as *const f32,
+                ptr(sw)? as *const f32,
+                yp as *mut std::ffi::c_void,
+                m as i32,
+                n as i32,
+                k as i32,
+                tile,
+                d.cuda_stream().cu_stream() as *mut std::ffi::c_void,
+            )
+        };
+        if code != 0 {
+            candle_core::bail!("cutlass int8 gemm m={m} n={n} k={k} tile={tile}: code {code}");
+        }
+        Ok(y)
+    }
+
     /// y [M, N] = x [M, K] w [N, K]^T in cuBLASLt's column-major terms: D [N, M] = op_T(W as [K, N]) * (X as [K, M]).
     #[allow(clippy::too_many_arguments)]
     pub fn gemm_w8(xq: &Tensor, sx: &Tensor, wq: &Tensor, sw: &Tensor, m: usize, n: usize, k: usize, mode: i32) -> Result<Tensor> {
         use candle_core::cuda_backend::cudarc::cublaslt::{result as lt, sys};
         use std::ffi::c_void;
+        let (tile, force_lt) = w8_env();
+        if mode == 1 && !force_lt {
+            return gemm_i8_fused(xq, sx, wq, sw, m, n, k, tile);
+        }
         let candle_core::Device::Cuda(d) = xq.device() else {
             unreachable!()
         };
