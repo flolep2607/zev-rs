@@ -16,20 +16,39 @@ fn build_w8_gemm() {
     use std::process::Command;
     println!("cargo:rerun-if-changed=csrc/w8_gemm.cu");
     println!("cargo:rerun-if-env-changed=CUTLASS_DIR");
-    let cutlass = std::env::var("CUTLASS_DIR").expect("the cuda feature needs CUTLASS_DIR (a CUTLASS v3.9 checkout) for csrc/w8_gemm.cu");
+    let cutlass = std::env::var("CUTLASS_DIR")
+        .expect("the cuda feature needs CUTLASS_DIR (a CUTLASS v3.9 checkout) for csrc/w8_gemm.cu");
     let cuda = std::env::var("CUDA_HOME").unwrap_or_else(|_| "/usr/local/cuda".into());
     let out = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
     let obj = out.join("w8_gemm.o");
     let ok = Command::new(format!("{cuda}/bin/nvcc"))
-        .args(["-O3", "-std=c++17", "--expt-relaxed-constexpr", "-Xcompiler", "-fPIC"])
-        .args(["-gencode", "arch=compute_80,code=sm_80", "-gencode", "arch=compute_86,code=sm_86", "-gencode", "arch=compute_89,code=sm_89"])
+        .args([
+            "-O3",
+            "-std=c++17",
+            "--expt-relaxed-constexpr",
+            "-Xcompiler",
+            "-fPIC",
+        ])
+        .args([
+            "-gencode",
+            "arch=compute_80,code=sm_80",
+            "-gencode",
+            "arch=compute_86,code=sm_86",
+            "-gencode",
+            "arch=compute_89,code=sm_89",
+        ])
         .arg(format!("-I{cutlass}/include"))
         .args(["-c", "csrc/w8_gemm.cu", "-o"])
         .arg(&obj)
         .status()
         .expect("nvcc");
     assert!(ok.success(), "nvcc failed on csrc/w8_gemm.cu");
-    let ok = Command::new("ar").arg("crs").arg(out.join("libkevw8.a")).arg(&obj).status().expect("ar");
+    let ok = Command::new("ar")
+        .arg("crs")
+        .arg(out.join("libkevw8.a"))
+        .arg(&obj)
+        .status()
+        .expect("ar");
     assert!(ok.success(), "ar failed");
     println!("cargo:rustc-link-search=native={}", out.display());
     println!("cargo:rustc-link-lib=static=kevw8");

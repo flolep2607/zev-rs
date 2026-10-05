@@ -106,7 +106,14 @@ impl Proj {
         match x {
             In::T(t) => self.forward(t),
             In::Q(xq, sx) => {
-                let Proj::W8 { q, s, out, inn, mode } = self else {
+                let Proj::W8 {
+                    q,
+                    s,
+                    out,
+                    inn,
+                    mode,
+                } = self
+                else {
                     candle_core::bail!("int8 rows given to a projection that is not KEV_W8=int8")
                 };
                 kernels::gemm_w8(xq, sx, q, s, xq.dim(0)?, *out, *inn, *mode)
@@ -126,7 +133,13 @@ impl Proj {
             Proj::Q8 { qs, d, out, inn } => {
                 x.matmul(&kernels::dequant_q8(qs, d, *out, *inn, x.dtype())?.t()?)
             }
-            Proj::W8 { q, s, out, inn, mode } => {
+            Proj::W8 {
+                q,
+                s,
+                out,
+                inn,
+                mode,
+            } => {
                 let m = x.elem_count() / inn;
                 let mut dims = x.dims().to_vec();
                 *dims.last_mut().unwrap() = *out;
@@ -140,14 +153,22 @@ impl Proj {
     }
     /// Re-encode a dense bf16 projection as W8 in place. Shapes cuBLASLt's 8-bit kernels cannot take (dims not
     /// multiples of 16) stay dense. Returns whether it converted.
-    fn to_w8(&mut self, mode: i32) -> Result<bool> {
-        let Proj::Dense(w) = self else { return Ok(false) };
+    fn quantize_w8(&mut self, mode: i32) -> Result<bool> {
+        let Proj::Dense(w) = self else {
+            return Ok(false);
+        };
         let (out, inn) = w.dims2()?;
         if w.dtype() != DType::BF16 || out % 16 != 0 || inn % 16 != 0 {
             return Ok(false);
         }
         let (q, s) = kernels::quant_rows(w, mode)?;
-        *self = Proj::W8 { q, s, out, inn, mode };
+        *self = Proj::W8 {
+            q,
+            s,
+            out,
+            inn,
+            mode,
+        };
         Ok(true)
     }
     /// Rows `ids` of the weight in `dt` (an embedding lookup, label rows).
@@ -157,7 +178,9 @@ impl Proj {
                 .index_select(&Tensor::new(ids, w.device())?, 0)?
                 .to_dtype(dt),
             Proj::Q8 { qs, d, inn, .. } => kernels::gather_q8(qs, d, ids, *inn, dt),
-            Proj::W8 { .. } => candle_core::bail!("rows of a W8 projection: embeddings and heads stay dense"),
+            Proj::W8 { .. } => {
+                candle_core::bail!("rows of a W8 projection: embeddings and heads stay dense")
+            }
         }
     }
     pub fn rows(&self) -> usize {
@@ -635,10 +658,17 @@ impl Model {
                     Mixer::Attn(a) => vec![&mut a.qkv, &mut a.o, &mut l.gate_up, &mut l.down],
                 };
                 for p in projs {
-                    if p.to_w8(mode)? { done += 1 } else { kept += 1 }
+                    if p.quantize_w8(mode)? {
+                        done += 1
+                    } else {
+                        kept += 1
+                    }
                 }
             }
-            eprintln!("kev: KEV_W8={} on {done} projections ({kept} kept bf16)", ["fp8", "int8", "fp8t"][mode as usize]);
+            eprintln!(
+                "kev: KEV_W8={} on {done} projections ({kept} kept bf16)",
+                ["fp8", "int8", "fp8t"][mode as usize]
+            );
         }
         eprintln!(
             "kev: {} backbone, {} layers, hidden {}, dtype {dt:?}, merged {merged} LoRA pairs",
@@ -994,7 +1024,8 @@ impl Model {
             x = (x * s)?;
         }
         let mut h = if mixer_in(&self.layers[0].mixer).takes_q8() {
-            let (_, q, s) = kernels::add_norm_q8(&x, None, Some(&self.layers[0].in_norm), eps, mode, 1.0)?;
+            let (_, q, s) =
+                kernels::add_norm_q8(&x, None, Some(&self.layers[0].in_norm), eps, mode, 1.0)?;
             In::Q(q, s)
         } else {
             In::T(kernels::add_norm(&x, None, Some(&self.layers[0].in_norm), eps, mode, 1.0)?.1)
@@ -1003,11 +1034,14 @@ impl Model {
         let nl = self.layers.len();
         for (i, l) in self.layers.iter().enumerate() {
             let last = i + 1 == nl;
-            let Some(core) = self.mixer(&l.mixer, &h, pack, last && picks.is_empty(), !last)? else {
+            let Some(core) = self.mixer(&l.mixer, &h, pack, last && picks.is_empty(), !last)?
+            else {
                 break;
             };
             let (core, xr) = if last {
-                let In::T(core) = core else { unreachable!("the last layer's mixer output stays bf16") };
+                let In::T(core) = core else {
+                    unreachable!("the last layer's mixer output stays bf16")
+                };
                 (
                     In::T(core.index_select(&picks_t, 0)?),
                     x.index_select(&picks_t, 0)?,
@@ -1023,10 +1057,12 @@ impl Model {
                 mixed = kernels::add_norm(&mixed, None, Some(w), eps, mode, 1.0)?.1;
             }
             let (xn, hn) = if l.gate_up.takes_q8() {
-                let (xn, q, s) = kernels::add_norm_q8(&xr, Some(&mixed), Some(&l.pre_mlp), eps, mode, 1.0)?;
+                let (xn, q, s) =
+                    kernels::add_norm_q8(&xr, Some(&mixed), Some(&l.pre_mlp), eps, mode, 1.0)?;
                 (xn, In::Q(q, s))
             } else {
-                let (xn, hn) = kernels::add_norm(&xr, Some(&mixed), Some(&l.pre_mlp), eps, mode, 1.0)?;
+                let (xn, hn) =
+                    kernels::add_norm(&xr, Some(&mixed), Some(&l.pre_mlp), eps, mode, 1.0)?;
                 (xn, In::T(hn))
             };
             let gu = l.gate_up.forward_in(&hn)?;
@@ -1051,7 +1087,8 @@ impl Model {
                 return hn2.to_dtype(DType::F32);
             }
             let (xn2, hn2) = if mixer_in(&self.layers[i + 1].mixer).takes_q8() {
-                let (xn2, q, s) = kernels::add_norm_q8(&xn, Some(&m), Some(next), eps, mode, l.scalar)?;
+                let (xn2, q, s) =
+                    kernels::add_norm_q8(&xn, Some(&m), Some(next), eps, mode, l.scalar)?;
                 (xn2, In::Q(q, s))
             } else {
                 let (xn2, hn2) = kernels::add_norm(&xn, Some(&m), Some(next), eps, mode, l.scalar)?;
@@ -1075,7 +1112,8 @@ impl Model {
         Ok(match m {
             Mixer::Gdn(g) => {
                 let p = g.proj.forward_in(h)?;
-                let o = kernels::conv_gdn(&p, &g.conv_w, &g.a_neg, &g.dt_bias, pack, &g.spec, g.lg)?;
+                let o =
+                    kernels::conv_gdn(&p, &g.conv_w, &g.a_neg, &g.dt_bias, pack, &g.spec, g.lg)?;
                 if cache_only {
                     return Ok(None);
                 }

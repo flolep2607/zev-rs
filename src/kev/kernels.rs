@@ -818,7 +818,14 @@ fn rounder(dt: DType) -> fn(f32) -> f32 {
 }
 
 /// add_norm with the normalized rows as int8 + one scale each, for a KEV_W8=int8 projection: (xo, q, s).
-pub fn add_norm_q8(x: &Tensor, m: Option<&Tensor>, w: Option<&Tensor>, eps: f64, mode: NormMode, scale: f64) -> Result<(Tensor, Tensor, Tensor)> {
+pub fn add_norm_q8(
+    x: &Tensor,
+    m: Option<&Tensor>,
+    w: Option<&Tensor>,
+    eps: f64,
+    mode: NormMode,
+    scale: f64,
+) -> Result<(Tensor, Tensor, Tensor)> {
     #[cfg(feature = "cuda")]
     if is_cuda(x) {
         return cu::add_norm_q8(x, m, w, eps, mode, scale);
@@ -850,7 +857,15 @@ pub fn gated_norm_q8(o: &Tensor, p: &Tensor, w: &Tensor, g: &GdnSpec) -> Result<
 /// The DeltaNet mixer's conv and gated delta rule in one call: on CUDA bf16 the fused conv_prep path (conv_gdn in
 /// kernels.cu terms), else conv() then gdn().
 #[allow(clippy::too_many_arguments)]
-pub fn conv_gdn(p: &Tensor, w: &Tensor, a_neg: &Tensor, dt_bias: &Tensor, pack: &Pack, g: &GdnSpec, lg: usize) -> Result<Tensor> {
+pub fn conv_gdn(
+    p: &Tensor,
+    w: &Tensor,
+    a_neg: &Tensor,
+    dt_bias: &Tensor,
+    pack: &Pack,
+    g: &GdnSpec,
+    lg: usize,
+) -> Result<Tensor> {
     #[cfg(feature = "cuda")]
     if is_cuda(p) && p.dtype() == DType::BF16 && g.hk <= 16 {
         return cu::conv_gdn(p, w, a_neg, dt_bias, pack, g, lg);
@@ -883,7 +898,16 @@ pub fn quant_rows(x: &Tensor, mode: i32) -> Result<(Tensor, Tensor)> {
 
 /// x [M, K] times w [N, K]^T, both from quant_rows (scales sx [M], sw [N]) -> y [M, N] bf16.
 #[allow(clippy::too_many_arguments)]
-pub fn gemm_w8(xq: &Tensor, sx: &Tensor, wq: &Tensor, sw: &Tensor, m: usize, n: usize, k: usize, mode: i32) -> Result<Tensor> {
+pub fn gemm_w8(
+    xq: &Tensor,
+    sx: &Tensor,
+    wq: &Tensor,
+    sw: &Tensor,
+    m: usize,
+    n: usize,
+    k: usize,
+    mode: i32,
+) -> Result<Tensor> {
     #[cfg(feature = "cuda")]
     if is_cuda(xq) {
         return cu::gemm_w8(xq, sx, wq, sw, m, n, k, mode);
@@ -1408,7 +1432,15 @@ mod cu {
     /// conv + gdn for bf16 in three kernels: conv_tail (the conv cache), conv_prep_bf16 (conv, SiLU, q/k norms, gates)
     /// and gdn_fast_bf16. The bf16 q|k|v row conv() writes is never materialized.
     #[allow(clippy::too_many_arguments)]
-    pub fn conv_gdn(p: &Tensor, w: &Tensor, a_neg: &Tensor, dt_bias: &Tensor, pack: &Pack, g: &GdnSpec, lg: usize) -> Result<Tensor> {
+    pub fn conv_gdn(
+        p: &Tensor,
+        w: &Tensor,
+        a_neg: &Tensor,
+        dt_bias: &Tensor,
+        pack: &Pack,
+        g: &GdnSpec,
+        lg: usize,
+    ) -> Result<Tensor> {
         let c = g.c();
         let m = meta(pack);
         conv_tail(p, pack, g, lg, m)?;
@@ -1675,7 +1707,14 @@ mod cu {
         Ok(o)
     }
 
-    pub fn add_norm_q8(x: &Tensor, m: Option<&Tensor>, w: Option<&Tensor>, eps: f64, mode: NormMode, scale: f64) -> Result<(Tensor, Tensor, Tensor)> {
+    pub fn add_norm_q8(
+        x: &Tensor,
+        m: Option<&Tensor>,
+        w: Option<&Tensor>,
+        eps: f64,
+        mode: NormMode,
+        scale: f64,
+    ) -> Result<(Tensor, Tensor, Tensor)> {
         let (n, h) = x.dims2()?;
         if x.dtype() != DType::BF16 || h > 256 * 16 {
             candle_core::bail!("add_norm_q8: bf16 rows of at most 4096");
@@ -1721,11 +1760,23 @@ mod cu {
             (n as u32, 1, 1),
             512,
             0,
-            &[A::P(ptr(gu)?), A::P(pq), A::P(ps), A::I(i as i32), A::I((act == Act::GeluTanh) as i32), A::I(round_act as i32)],
+            &[
+                A::P(ptr(gu)?),
+                A::P(pq),
+                A::P(ps),
+                A::I(i as i32),
+                A::I((act == Act::GeluTanh) as i32),
+                A::I(round_act as i32),
+            ],
         )?;
         Ok((q, s))
     }
-    pub fn gated_norm_q8(o: &Tensor, p: &Tensor, w: &Tensor, g: &GdnSpec) -> Result<(Tensor, Tensor)> {
+    pub fn gated_norm_q8(
+        o: &Tensor,
+        p: &Tensor,
+        w: &Tensor,
+        g: &GdnSpec,
+    ) -> Result<(Tensor, Tensor)> {
         let n = o.dim(0)?;
         if p.dtype() != DType::BF16 || g.hv * 32 > 1024 {
             candle_core::bail!("gated_norm_q8: bf16, at most 32 value heads");
@@ -1909,10 +1960,19 @@ mod cu {
     /// One cuBLASLt handle and workspace per device, for the W8A8 projections.
     fn lt_handle(d: &CudaDevice) -> Result<(usize, u64, usize)> {
         use candle_core::cuda_backend::cudarc::cublaslt::result as lt;
-        type Handles = HashMap<candle_core::cuda_backend::DeviceId, (usize, candle_core::cuda_backend::cudarc::driver::CudaSlice<u8>)>;
+        type Handles = HashMap<
+            candle_core::cuda_backend::DeviceId,
+            (
+                usize,
+                candle_core::cuda_backend::cudarc::driver::CudaSlice<u8>,
+            ),
+        >;
         static LT: std::sync::OnceLock<Mutex<Handles>> = std::sync::OnceLock::new();
         const WS: usize = 32 << 20;
-        let mut g = LT.get_or_init(|| Mutex::new(HashMap::new())).lock().unwrap();
+        let mut g = LT
+            .get_or_init(|| Mutex::new(HashMap::new()))
+            .lock()
+            .unwrap();
         if !g.contains_key(&d.id()) {
             let h = lt::create_handle().map_err(candle_core::Error::wrap)? as usize;
             let ws = d.cuda_stream().alloc_zeros::<u8>(WS).w()?;
@@ -1933,7 +1993,14 @@ mod cu {
             let n = (r * k) as i64;
             let m = Tensor::zeros(1, DType::F32, x.device())?;
             let grid = ((n + 2047) / 2048).min(1024) as u32;
-            launch(&x, "amax_bf16", (grid, 1, 1), 256, 0, &[A::P(ptr(&x)?), A::L(n), A::P(ptr(&m)?)])?;
+            launch(
+                &x,
+                "amax_bf16",
+                (grid, 1, 1),
+                256,
+                0,
+                &[A::P(ptr(&x)?), A::L(n), A::P(ptr(&m)?)],
+            )?;
             Some(m)
         } else {
             None
@@ -1944,7 +2011,14 @@ mod cu {
             (r as u32, 1, 1),
             256,
             0,
-            &[A::P(ptr(&x)?), A::P(qp), A::P(sp), A::I(k as i32), A::I(mode), A::P(opt(amax.as_ref())?)],
+            &[
+                A::P(ptr(&x)?),
+                A::P(qp),
+                A::P(sp),
+                A::I(k as i32),
+                A::I(mode),
+                A::P(opt(amax.as_ref())?),
+            ],
         )?;
         Ok((q, s))
     }
@@ -1969,14 +2043,26 @@ mod cu {
     fn w8_env() -> (i32, bool) {
         static ENV: std::sync::OnceLock<(i32, bool)> = std::sync::OnceLock::new();
         *ENV.get_or_init(|| {
-            let tile = std::env::var("KEV_W8_TILE").ok().and_then(|t| t.parse().ok()).unwrap_or(0);
+            let tile = std::env::var("KEV_W8_TILE")
+                .ok()
+                .and_then(|t| t.parse().ok())
+                .unwrap_or(0);
             (tile, std::env::var("KEV_W8_LT").is_ok_and(|v| v == "1"))
         })
     }
 
     /// int8 through the CUTLASS kernel, scales in its epilogue: no int32 round trip, no rescale pass.
     #[allow(clippy::too_many_arguments)]
-    fn gemm_i8_fused(xq: &Tensor, sx: &Tensor, wq: &Tensor, sw: &Tensor, m: usize, n: usize, k: usize, tile: i32) -> Result<Tensor> {
+    fn gemm_i8_fused(
+        xq: &Tensor,
+        sx: &Tensor,
+        wq: &Tensor,
+        sw: &Tensor,
+        m: usize,
+        n: usize,
+        k: usize,
+        tile: i32,
+    ) -> Result<Tensor> {
         let candle_core::Device::Cuda(d) = xq.device() else {
             unreachable!()
         };
@@ -2003,7 +2089,16 @@ mod cu {
 
     /// y [M, N] = x [M, K] w [N, K]^T in cuBLASLt's column-major terms: D [N, M] = op_T(W as [K, N]) * (X as [K, M]).
     #[allow(clippy::too_many_arguments)]
-    pub fn gemm_w8(xq: &Tensor, sx: &Tensor, wq: &Tensor, sw: &Tensor, m: usize, n: usize, k: usize, mode: i32) -> Result<Tensor> {
+    pub fn gemm_w8(
+        xq: &Tensor,
+        sx: &Tensor,
+        wq: &Tensor,
+        sw: &Tensor,
+        m: usize,
+        n: usize,
+        k: usize,
+        mode: i32,
+    ) -> Result<Tensor> {
         use candle_core::cuda_backend::cudarc::cublaslt::{result as lt, sys};
         use std::ffi::c_void;
         let (tile, force_lt) = w8_env();
@@ -2017,11 +2112,25 @@ mod cu {
         let (h, ws, ws_size) = lt_handle(d)?;
         let h = h as sys::cublasLtHandle_t;
         let (t8, td, compute, scale) = if mode != 1 {
-            (sys::cudaDataType::CUDA_R_8F_E4M3, sys::cudaDataType::CUDA_R_16BF, sys::cublasComputeType_t::CUBLAS_COMPUTE_32F, sys::cudaDataType::CUDA_R_32F)
+            (
+                sys::cudaDataType::CUDA_R_8F_E4M3,
+                sys::cudaDataType::CUDA_R_16BF,
+                sys::cublasComputeType_t::CUBLAS_COMPUTE_32F,
+                sys::cudaDataType::CUDA_R_32F,
+            )
         } else {
-            (sys::cudaDataType::CUDA_R_8I, sys::cudaDataType::CUDA_R_32I, sys::cublasComputeType_t::CUBLAS_COMPUTE_32I, sys::cudaDataType::CUDA_R_32I)
+            (
+                sys::cudaDataType::CUDA_R_8I,
+                sys::cudaDataType::CUDA_R_32I,
+                sys::cublasComputeType_t::CUBLAS_COMPUTE_32I,
+                sys::cudaDataType::CUDA_R_32I,
+            )
         };
-        let (acc, accp) = out(xq, &[m, n], if mode != 1 { DType::BF16 } else { DType::U32 })?;
+        let (acc, accp) = out(
+            xq,
+            &[m, n],
+            if mode != 1 { DType::BF16 } else { DType::U32 },
+        )?;
         let (one_f, zero_f, one_i, zero_i) = (1f32, 0f32, 1i32, 0i32);
         let (alpha, beta): (*const c_void, *const c_void) = if mode != 1 {
             (&one_f as *const f32 as _, &zero_f as *const f32 as _)
@@ -2040,18 +2149,32 @@ mod cu {
                 std::mem::size_of_val(&op_t),
             )
             .map_err(e)?;
-            let set = |attr, v: *const c_void, size| lt::set_matmul_desc_attribute(desc, attr, v, size).map_err(e);
+            let set = |attr, v: *const c_void, size| {
+                lt::set_matmul_desc_attribute(desc, attr, v, size).map_err(e)
+            };
             if mode != 1 {
                 // Ada fp8 without fast accumulation promotes partial sums to f32 every few k-steps and runs slower;
                 // forward-only inference takes the fast path (as Transformer Engine does).
                 let fast: i8 = 1;
-                set(sys::cublasLtMatmulDescAttributes_t::CUBLASLT_MATMUL_DESC_FAST_ACCUM, &fast as *const i8 as _, 1)?;
+                set(
+                    sys::cublasLtMatmulDescAttributes_t::CUBLASLT_MATMUL_DESC_FAST_ACCUM,
+                    &fast as *const i8 as _,
+                    1,
+                )?;
             }
             let (swp, sxp) = (ptr(sw)?, ptr(sx)?);
             if mode == 2 {
                 // one scale per tensor, in element 0 of the per-row scale vectors: cuBLASLt applies it, no rescale
-                set(sys::cublasLtMatmulDescAttributes_t::CUBLASLT_MATMUL_DESC_A_SCALE_POINTER, &swp as *const u64 as _, 8)?;
-                set(sys::cublasLtMatmulDescAttributes_t::CUBLASLT_MATMUL_DESC_B_SCALE_POINTER, &sxp as *const u64 as _, 8)?;
+                set(
+                    sys::cublasLtMatmulDescAttributes_t::CUBLASLT_MATMUL_DESC_A_SCALE_POINTER,
+                    &swp as *const u64 as _,
+                    8,
+                )?;
+                set(
+                    sys::cublasLtMatmulDescAttributes_t::CUBLASLT_MATMUL_DESC_B_SCALE_POINTER,
+                    &sxp as *const u64 as _,
+                    8,
+                )?;
             }
             let a = lt::create_matrix_layout(t8, k as u64, n as u64, k as i64).map_err(e)?;
             let b = lt::create_matrix_layout(t8, k as u64, m as u64, k as i64).map_err(e)?;
@@ -2092,19 +2215,50 @@ mod cu {
             let _ = lt::destroy_matrix_layout(b);
             let _ = lt::destroy_matrix_layout(a);
             let _ = lt::destroy_matmul_desc(desc);
-            r.map_err(|err| candle_core::Error::Msg(format!("cublasLt w8 gemm m={m} n={n} k={k} mode={mode}: {err:?}")))?;
+            r.map_err(|err| {
+                candle_core::Error::Msg(format!(
+                    "cublasLt w8 gemm m={m} n={n} k={k} mode={mode}: {err:?}"
+                ))
+            })?;
         }
         let total = (m * n) as i64;
         let rows = (m as u32, 1, 1);
         match mode {
             2 => Ok(acc),
             0 => {
-                launch(&acc, "rescale_bf16", rows, 256, 0, &[A::P(accp), A::P(ptr(sx)?), A::P(ptr(sw)?), A::L(total), A::I(n as i32)])?;
+                launch(
+                    &acc,
+                    "rescale_bf16",
+                    rows,
+                    256,
+                    0,
+                    &[
+                        A::P(accp),
+                        A::P(ptr(sx)?),
+                        A::P(ptr(sw)?),
+                        A::L(total),
+                        A::I(n as i32),
+                    ],
+                )?;
                 Ok(acc)
             }
             _ => {
                 let (y, yp) = out(xq, &[m, n], DType::BF16)?;
-                launch(&y, "rescale_i32", rows, 256, 0, &[A::P(accp), A::P(ptr(sx)?), A::P(ptr(sw)?), A::P(yp), A::L(total), A::I(n as i32)])?;
+                launch(
+                    &y,
+                    "rescale_i32",
+                    rows,
+                    256,
+                    0,
+                    &[
+                        A::P(accp),
+                        A::P(ptr(sx)?),
+                        A::P(ptr(sw)?),
+                        A::P(yp),
+                        A::L(total),
+                        A::I(n as i32),
+                    ],
+                )?;
                 Ok(y)
             }
         }
