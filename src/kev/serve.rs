@@ -15,6 +15,7 @@ use axum::{Json, Router};
 use candle_core::Result;
 use serde_json::{json, Value};
 use std::collections::{HashMap, VecDeque};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Instant;
 
@@ -90,10 +91,39 @@ pub struct Opts {
     pub pass_tokens: usize, // token budget of one pass (a larger single request still runs, alone)
 }
 
+/// What /health reads. A worker counts as alive from the end of its warm-up until its thread exits (a drop guard, so a
+/// panic counts too), and each finished pass stamps `last_pass_ms`. Requests in flight with no pass for STALL_SECS is
+/// a wedged GPU: a card that falls off the bus leaves its thread blocked inside a CUDA call, with the process up and a
+/// plain "ok" route still answering, so nothing restarts it.
+#[derive(Default)]
+pub struct Health {
+    alive: AtomicUsize,
+    in_flight: AtomicUsize,
+    last_pass_ms: AtomicU64,
+}
+
+/// A 32k-token pass takes seconds; two minutes without one while requests wait is not slow, it is stuck.
+const STALL_SECS: u64 = 120;
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64)
+}
+
+struct Counted<'a>(&'a AtomicUsize);
+
+impl Drop for Counted<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
 struct Worker {
     m: Model,
     readout: Readout,
     cache: Prefixes,
+    health: Arc<Health>,
 }
 
 impl Worker {
@@ -173,6 +203,10 @@ impl Worker {
         if let Err(e) = warm.and_then(|_| self.m.dev.synchronize()) {
             eprintln!("kev: warm-up pass failed: {e}");
         }
+        let health = self.health.clone();
+        health.alive.fetch_add(1, Ordering::SeqCst);
+        let _alive = Counted(&health.alive);
+        health.last_pass_ms.store(now_ms(), Ordering::SeqCst);
         let mut carry: Option<Job> = None;
         loop {
             let mut batch = Vec::new();
@@ -205,6 +239,7 @@ impl Worker {
             let t0 = Instant::now();
             let res = self.pass(&batch);
             let _ = self.m.dev.synchronize();
+            health.last_pass_ms.store(now_ms(), Ordering::SeqCst);
             let ms = t0.elapsed().as_secs_f64() * 1e3;
             match res {
                 Ok(rs) => {
@@ -239,6 +274,7 @@ pub struct Served {
     pub entrant: Entrant,
     pub card: Value,
     tx: mpsc::SyncSender<Job>,
+    health: Arc<Health>,
 }
 
 impl Served {
@@ -248,6 +284,8 @@ impl Served {
         state: Vec<u32>,
         rows: Vec<RowSpec>,
     ) -> std::result::Result<(Outputs, f64), (StatusCode, String)> {
+        self.health.in_flight.fetch_add(1, Ordering::SeqCst);
+        let _in_flight = Counted(&self.health.in_flight);
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx
             .try_send(Job {
@@ -286,8 +324,9 @@ pub fn spawn(
 ) -> Served {
     let (tx, rx) = mpsc::sync_channel::<Job>(MAX_QUEUE_DEPTH);
     let rx = Arc::new(Mutex::new(rx));
+    let health = Arc::new(Health::default());
     for (i, (m, readout)) in workers.into_iter().enumerate() {
-        let (rx, opts) = (rx.clone(), opts.clone());
+        let (rx, opts, health) = (rx.clone(), opts.clone(), health.clone());
         std::thread::Builder::new()
             .name(format!(
                 "{}-{i}",
@@ -298,6 +337,7 @@ pub fn spawn(
                     m,
                     readout,
                     cache: Prefixes::new(opts.prefix_cache),
+                    health,
                 }
                 .serve(rx, opts)
             })
@@ -308,7 +348,56 @@ pub fn spawn(
         entrant,
         card,
         tx,
+        health,
     }
+}
+
+/// Why a model is unhealthy, if it is: no live worker, or requests waiting with no pass for STALL_SECS. An idle model
+/// (nothing in flight) is healthy however long since its last pass.
+fn health_problem(workers: usize, in_flight: usize, idle_s: u64) -> Option<&'static str> {
+    if workers == 0 {
+        Some("model thread stopped")
+    } else if in_flight > 0 && idle_s > STALL_SECS {
+        Some("stalled: requests waiting and no pass finished")
+    } else {
+        None
+    }
+}
+
+/// /health: 200 while every served model has a live worker and is not stalled, else 503 with the reason. Both
+/// readiness (out of the Service) and liveness (restart the pod) can probe it.
+async fn health(State(s): State<AppState>) -> (StatusCode, Json<Value>) {
+    let now = now_ms();
+    let mut ok = true;
+    let models: Vec<Value> = s
+        .models
+        .iter()
+        .map(|m| {
+            let h = &m.health;
+            let (alive, in_flight) = (
+                h.alive.load(Ordering::SeqCst),
+                h.in_flight.load(Ordering::SeqCst),
+            );
+            let idle_s = now.saturating_sub(h.last_pass_ms.load(Ordering::SeqCst)) / 1000;
+            let problem = health_problem(alive, in_flight, idle_s);
+            ok &= problem.is_none();
+            json!({
+                "name": m.names.first(), "workers": alive, "in_flight": in_flight,
+                "seconds_since_pass": idle_s, "problem": problem,
+            })
+        })
+        .collect();
+    let code = if ok {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
+    (
+        code,
+        Json(
+            json!({"status": if ok { "ok" } else { "unhealthy" }, "engine": "zev-candle", "models": models}),
+        ),
+    )
 }
 
 #[derive(Clone)]
@@ -381,10 +470,7 @@ pub fn router(models: Vec<Served>) -> Router {
         api_key: std::env::var("KEV_API_KEY").ok().filter(|k| !k.is_empty()),
     };
     Router::new()
-        .route(
-            "/health",
-            get(|| async { Json(json!({"status": "ok", "engine": "zev-candle"})) }),
-        )
+        .route("/health", get(health))
         .route("/v1/models", get(list_models))
         .route("/v1/systemone", post(systemone))
         .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024))
@@ -394,6 +480,16 @@ pub fn router(models: Vec<Served>) -> Router {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_health_problem() {
+        assert_eq!(health_problem(1, 0, 10_000), None); // idle for hours: healthy
+        assert_eq!(health_problem(1, 5, 3), None); // busy, passes finishing
+        assert_eq!(health_problem(0, 0, 0), Some("model thread stopped"));
+        assert!(health_problem(1, 5, STALL_SECS + 1)
+            .unwrap()
+            .starts_with("stalled")); // wedged GPU
+    }
 
     #[test]
     fn test_constant_time_eq() {
