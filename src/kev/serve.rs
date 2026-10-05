@@ -95,11 +95,69 @@ pub struct Opts {
 /// panic counts too), and each finished pass stamps `last_pass_ms`. Requests in flight with no pass for STALL_SECS is
 /// a wedged GPU: a card that falls off the bus leaves its thread blocked inside a CUDA call, with the process up and a
 /// plain "ok" route still answering, so nothing restarts it.
+/// It also carries the counters /metrics renders.
 #[derive(Default)]
 pub struct Health {
     alive: AtomicUsize,
     in_flight: AtomicUsize,
     last_pass_ms: AtomicU64,
+    passes: AtomicU64,
+    pass_errors: AtomicU64,
+    pass_requests: AtomicU64,
+    pass_tokens: AtomicU64,
+    pass_seconds: Hist,
+    cache_hits: AtomicU64,
+    cache_misses: AtomicU64,
+    /// by OUTCOMES index
+    requests: [AtomicU64; 4],
+    request_seconds: Hist,
+}
+
+/// Request outcomes as /metrics labels them: 2xx, 4xx other than 429, 429 (queue full), 5xx.
+const OUTCOMES: [&str; 4] = ["ok", "bad_request", "rejected", "error"];
+
+fn outcome(code: StatusCode) -> usize {
+    if code.is_success() {
+        0
+    } else if code == StatusCode::TOO_MANY_REQUESTS {
+        2
+    } else if code.is_client_error() {
+        1
+    } else {
+        3
+    }
+}
+
+/// Histogram bucket upper bounds, seconds. A request is a queue wait plus a pass; a pass is one packed forward.
+const REQUEST_BOUNDS: [f64; 11] = [0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0];
+const PASS_BOUNDS: [f64; 11] = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0];
+
+/// A Prometheus histogram without locks: per-bucket counts (the last is +Inf), made cumulative when rendered.
+#[derive(Default)]
+struct Hist {
+    counts: [AtomicU64; 12],
+    sum_us: AtomicU64,
+}
+
+impl Hist {
+    fn observe(&self, bounds: &[f64; 11], secs: f64) {
+        let i = bounds.iter().position(|b| secs <= *b).unwrap_or(11);
+        self.counts[i].fetch_add(1, Ordering::Relaxed);
+        self.sum_us
+            .fetch_add((secs * 1e6) as u64, Ordering::Relaxed);
+    }
+    fn render(&self, out: &mut String, name: &str, labels: &str, bounds: &[f64; 11]) {
+        use std::fmt::Write;
+        let mut cum = 0;
+        for (i, c) in self.counts.iter().enumerate() {
+            cum += c.load(Ordering::Relaxed);
+            let le = bounds.get(i).map_or("+Inf".to_string(), |b| b.to_string());
+            let _ = writeln!(out, "{name}_bucket{{{labels},le=\"{le}\"}} {cum}");
+        }
+        let sum = self.sum_us.load(Ordering::Relaxed) as f64 / 1e6;
+        let _ = writeln!(out, "{name}_sum{{{labels}}} {sum}");
+        let _ = writeln!(out, "{name}_count{{{labels}}} {cum}");
+    }
 }
 
 /// A 32k-token pass takes seconds; two minutes without one while requests wait is not slow, it is stuck.
@@ -181,8 +239,15 @@ impl Worker {
         for (k, c) in made {
             self.cache.put(k, c);
         }
-        self.cache.hits += hits.iter().filter(|h| **h).count();
-        self.cache.misses += hits.iter().filter(|h| !**h).count();
+        let hit = hits.iter().filter(|h| **h).count();
+        self.cache.hits += hit;
+        self.cache.misses += hits.len() - hit;
+        self.health
+            .cache_hits
+            .fetch_add(hit as u64, Ordering::Relaxed);
+        self.health
+            .cache_misses
+            .fetch_add((hits.len() - hit) as u64, Ordering::Relaxed);
         let mut out = Vec::with_capacity(jobs.len());
         for j in jobs {
             let o: Outputs = per_row.by_ref().take(j.rows.len()).collect();
@@ -241,6 +306,17 @@ impl Worker {
             let _ = self.m.dev.synchronize();
             health.last_pass_ms.store(now_ms(), Ordering::SeqCst);
             let ms = t0.elapsed().as_secs_f64() * 1e3;
+            health.passes.fetch_add(1, Ordering::Relaxed);
+            health
+                .pass_requests
+                .fetch_add(batch.len() as u64, Ordering::Relaxed);
+            health
+                .pass_tokens
+                .fetch_add(tokens as u64, Ordering::Relaxed);
+            health.pass_seconds.observe(&PASS_BOUNDS, ms / 1e3);
+            if res.is_err() {
+                health.pass_errors.fetch_add(1, Ordering::Relaxed);
+            }
             match res {
                 Ok(rs) => {
                     for (j, o) in batch.into_iter().zip(rs) {
@@ -404,6 +480,8 @@ async fn health(State(s): State<AppState>) -> (StatusCode, Json<Value>) {
 pub struct AppState {
     models: Arc<Vec<Served>>,
     api_key: Option<String>,
+    /// requests turned away before a model is chosen: [bad or missing API key, unparsable JSON]
+    refused: Arc<[AtomicU64; 2]>,
 }
 
 type Reply = std::result::Result<Json<Value>, (StatusCode, Json<Value>)>;
@@ -427,14 +505,17 @@ async fn systemone(State(s): State<AppState>, headers: HeaderMap, body: String) 
             .unwrap_or("");
         let expected = format!("Bearer {key}");
         if !constant_time_eq(got.as_bytes(), expected.as_bytes()) {
+            s.refused[0].fetch_add(1, Ordering::Relaxed);
             return Err(err(
                 StatusCode::UNAUTHORIZED,
                 "missing or invalid API key; send Authorization: Bearer <KEV_API_KEY>",
             ));
         }
     }
-    let req: Value = serde_json::from_str(&body)
-        .map_err(|e| err(StatusCode::UNPROCESSABLE_ENTITY, e.to_string()))?;
+    let req: Value = serde_json::from_str(&body).map_err(|e| {
+        s.refused[1].fetch_add(1, Ordering::Relaxed);
+        err(StatusCode::UNPROCESSABLE_ENTITY, e.to_string())
+    })?;
     // `model` selects a served model by name; any other name (e.g. the harness's "jev-latest") gets the first one
     let name = req.get("model").and_then(Value::as_str).unwrap_or("");
     let m = s
@@ -442,11 +523,14 @@ async fn systemone(State(s): State<AppState>, headers: HeaderMap, body: String) 
         .iter()
         .find(|m| m.names.iter().any(|n| n == name))
         .unwrap_or(&s.models[0]);
-    m.entrant
-        .answer(m, &req)
-        .await
-        .map(Json)
-        .map_err(|(c, e)| err(c, e))
+    let t0 = Instant::now();
+    let r = m.entrant.answer(m, &req).await;
+    let code = r.as_ref().map_or_else(|(c, _)| *c, |_| StatusCode::OK);
+    m.health.requests[outcome(code)].fetch_add(1, Ordering::Relaxed);
+    m.health
+        .request_seconds
+        .observe(&REQUEST_BOUNDS, t0.elapsed().as_secs_f64());
+    r.map(Json).map_err(|(c, e)| err(c, e))
 }
 
 async fn list_models(State(s): State<AppState>) -> Json<Value> {
@@ -464,13 +548,150 @@ async fn list_models(State(s): State<AppState>) -> Json<Value> {
     Json(json!({ "models": cards }))
 }
 
+/// /metrics in the Prometheus text format, one series per served model (labelled by its first name).
+async fn metrics(
+    State(s): State<AppState>,
+) -> ([(axum::http::HeaderName, &'static str); 1], String) {
+    use std::fmt::Write;
+    let mut out = String::new();
+    let now = now_ms();
+    let counter = |out: &mut String, name: &str, help: &str| {
+        let _ = writeln!(out, "# HELP {name} {help}\n# TYPE {name} counter");
+    };
+    let gauge = |out: &mut String, name: &str, help: &str| {
+        let _ = writeln!(out, "# HELP {name} {help}\n# TYPE {name} gauge");
+    };
+    let label = |m: &Served| {
+        format!(
+            "model=\"{}\"",
+            m.names.first().map_or("", |n| n.as_str()).replace('"', "")
+        )
+    };
+    counter(
+        &mut out,
+        "zev_requests_total",
+        "systemone requests by outcome (ok, bad_request, rejected = 429 queue full, error)",
+    );
+    for m in s.models.iter() {
+        for (i, o) in OUTCOMES.iter().enumerate() {
+            let _ = writeln!(
+                out,
+                "zev_requests_total{{{},outcome=\"{o}\"}} {}",
+                label(m),
+                m.health.requests[i].load(Ordering::Relaxed)
+            );
+        }
+    }
+    counter(
+        &mut out,
+        "zev_refused_total",
+        "requests turned away before reaching a model",
+    );
+    for (i, why) in ["unauthorized", "invalid_json"].iter().enumerate() {
+        let _ = writeln!(
+            out,
+            "zev_refused_total{{reason=\"{why}\"}} {}",
+            s.refused[i].load(Ordering::Relaxed)
+        );
+    }
+    let _ = writeln!(out, "# HELP zev_request_duration_seconds systemone request latency, queue wait included\n# TYPE zev_request_duration_seconds histogram");
+    for m in s.models.iter() {
+        m.health.request_seconds.render(
+            &mut out,
+            "zev_request_duration_seconds",
+            &label(m),
+            &REQUEST_BOUNDS,
+        );
+    }
+    let _ = writeln!(out, "# HELP zev_pass_duration_seconds GPU time of one packed pass\n# TYPE zev_pass_duration_seconds histogram");
+    for m in s.models.iter() {
+        m.health.pass_seconds.render(
+            &mut out,
+            "zev_pass_duration_seconds",
+            &label(m),
+            &PASS_BOUNDS,
+        );
+    }
+    type Get = fn(&Health) -> u64;
+    let counters: [(&str, &str, Get); 6] = [
+        ("zev_passes_total", "packed passes run", |h| {
+            h.passes.load(Ordering::Relaxed)
+        }),
+        (
+            "zev_pass_errors_total",
+            "packed passes that failed (every request in them got a 500)",
+            |h| h.pass_errors.load(Ordering::Relaxed),
+        ),
+        (
+            "zev_pass_requests_total",
+            "requests carried by passes; / zev_passes_total = batch size",
+            |h| h.pass_requests.load(Ordering::Relaxed),
+        ),
+        (
+            "zev_pass_tokens_total",
+            "input tokens carried by passes",
+            |h| h.pass_tokens.load(Ordering::Relaxed),
+        ),
+        (
+            "zev_prefix_cache_hits_total",
+            "request states found in the prefix cache",
+            |h| h.cache_hits.load(Ordering::Relaxed),
+        ),
+        (
+            "zev_prefix_cache_misses_total",
+            "request states computed",
+            |h| h.cache_misses.load(Ordering::Relaxed),
+        ),
+    ];
+    for (name, help, get) in counters {
+        counter(&mut out, name, help);
+        for m in s.models.iter() {
+            let _ = writeln!(out, "{name}{{{}}} {}", label(m), get(&m.health));
+        }
+    }
+    let gauges: [(&str, &str, Get); 3] = [
+        ("zev_in_flight", "requests queued or running", |h| {
+            h.in_flight.load(Ordering::SeqCst) as u64
+        }),
+        ("zev_workers", "live model threads (0 = /health 503)", |h| {
+            h.alive.load(Ordering::SeqCst) as u64
+        }),
+        (
+            "zev_seconds_since_pass",
+            "seconds since the last finished pass",
+            |h| h.last_pass_ms.load(Ordering::SeqCst),
+        ),
+    ];
+    for (name, help, get) in gauges {
+        gauge(&mut out, name, help);
+        for m in s.models.iter() {
+            let v = get(&m.health);
+            let v = if name == "zev_seconds_since_pass" {
+                now.saturating_sub(v) / 1000
+            } else {
+                v
+            };
+            let _ = writeln!(out, "{name}{{{}}} {v}", label(m));
+        }
+    }
+    (
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4",
+        )],
+        out,
+    )
+}
+
 pub fn router(models: Vec<Served>) -> Router {
     let s = AppState {
         models: Arc::new(models),
         api_key: std::env::var("KEV_API_KEY").ok().filter(|k| !k.is_empty()),
+        refused: Arc::new(Default::default()),
     };
     Router::new()
         .route("/health", get(health))
+        .route("/metrics", get(metrics))
         .route("/v1/models", get(list_models))
         .route("/v1/systemone", post(systemone))
         .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024))
@@ -480,6 +701,22 @@ pub fn router(models: Vec<Served>) -> Router {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_hist_render() {
+        let h = Hist::default();
+        h.observe(&PASS_BOUNDS, 0.02); // <= 0.025
+        h.observe(&PASS_BOUNDS, 99.0); // +Inf
+        let mut out = String::new();
+        h.render(&mut out, "x", "model=\"k\"", &PASS_BOUNDS);
+        assert!(out.contains("x_bucket{model=\"k\",le=\"0.01\"} 0\n"));
+        assert!(out.contains("x_bucket{model=\"k\",le=\"0.025\"} 1\n")); // cumulative from here
+        assert!(out.contains("x_bucket{model=\"k\",le=\"30\"} 1\n"));
+        assert!(out.contains("x_bucket{model=\"k\",le=\"+Inf\"} 2\n"));
+        assert!(out.contains("x_count{model=\"k\"} 2\n"));
+        assert_eq!(outcome(StatusCode::TOO_MANY_REQUESTS), 2);
+        assert_eq!(outcome(StatusCode::UNPROCESSABLE_ENTITY), 1);
+    }
 
     #[test]
     fn test_health_problem() {
