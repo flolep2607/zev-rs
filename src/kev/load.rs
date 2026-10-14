@@ -315,29 +315,39 @@ fn kev_served(
     Ok(spawn(workers, Entrant::Kev(Encoder::new(tokenizer(base)?)?), names, o.serve.clone(), card))
 }
 
-/// Every `--model`, in order (the first answers unknown names). Kev adapters that share a base load it once per device
-/// and attach each LoRA unmerged (`Model::with_adapter`): N adapters cost one base plus N small (A, B) sets, against N
-/// merged backbones. A lone Kev on its base stays merged (the fused int8 path).
+/// Every `--model`, in order (the first answers unknown names). Kev adapters that share a base load it once per device:
+/// the first of them is merged into it (fused int8 path, full speed), each other one attaches unmerged as its own LoRA
+/// minus the merged one's (`Model::with_adapter`), exact. N adapters cost one base plus N-1 small (A, B) sets against N
+/// merged backbones. List the busiest adapter first.
 pub fn load_all(specs: &[String], o: &LoadOpts) -> Res<Vec<Served>> {
     let dirs: Vec<PathBuf> = specs.iter().map(|s| resolve(s)).collect::<Res<_>>()?;
     let bases: Vec<Option<(String, PathBuf)>> = dirs.iter().map(|d| kev_base(d)).collect::<Res<_>>()?;
     let shared = |b: &Path| bases.iter().flatten().filter(|(_, x)| x == b).count() > 1;
-    let mut loaded: Vec<(PathBuf, Vec<Model>)> = Vec::new(); // one unmerged base per device, per base dir
+    let mut loaded: Vec<(PathBuf, PathBuf, Vec<Model>)> = Vec::new(); // per base dir: the merged adapter, its model per device
     let mut out = Vec::new();
     for ((spec, dir), base) in specs.iter().zip(&dirs).zip(&bases) {
         let t0 = std::time::Instant::now();
         match base {
             Some((base_spec, b)) if shared(b) => {
-                if !loaded.iter().any(|(x, _)| x == b) {
-                    let mut ms = Vec::new();
-                    for &d in &o.devices {
-                        ms.push(Model::load(b, None, o.dtype, &device(d)?)?);
+                // the first adapter on a base is merged into it (its requests take the fused int8 path); the others
+                // attach as exact deltas against it
+                match loaded.iter().find(|(x, _, _)| x == b) {
+                    None => {
+                        let mut ms = Vec::new();
+                        for &d in &o.devices {
+                            ms.push(Model::load(b, Some(dir), o.dtype, &device(d)?)?);
+                        }
+                        out.push(kev_served(spec, dir, base_spec, b, ms.clone(), "merged, base shared", o, t0)?);
+                        loaded.push((b.clone(), dir.clone(), ms));
                     }
-                    loaded.push((b.clone(), ms));
+                    Some((_, hot, ms)) => {
+                        let models = ms
+                            .iter()
+                            .map(|m| m.with_adapter(b, dir, Some(hot)))
+                            .collect::<candle_core::Result<Vec<_>>>()?;
+                        out.push(kev_served(spec, dir, base_spec, b, models, "unmerged delta on a shared base", o, t0)?);
+                    }
                 }
-                let (_, ms) = loaded.iter().find(|(x, _)| x == b).unwrap();
-                let models = ms.iter().map(|m| m.with_adapter(b, dir)).collect::<candle_core::Result<Vec<_>>>()?;
-                out.push(kev_served(spec, dir, base_spec, b, models, "unmerged, shared base", o, t0)?);
             }
             _ => out.push(load(spec, o)?),
         }

@@ -300,6 +300,8 @@ fn gguf_name(hf: &str) -> Option<String> {
 pub struct Loader {
     base: Source,
     lora: Option<(MmapedSafetensors, f64)>,
+    /// An adapter already merged into the base this unmerged one is attached to: subtracted (`Model::with_adapter`).
+    minus: Option<(MmapedSafetensors, f64)>,
     prefix: String,
     pub dev: Device,
     pub dt: DType,
@@ -369,21 +371,11 @@ impl Loader {
                 )
             }
         };
-        let lora = match lora_dir {
-            Some(d) => {
-                let acfg = read_json(&d.join("adapter_config.json"))?;
-                let scale =
-                    acfg["lora_alpha"].as_f64().unwrap_or(0.0) / acfg["r"].as_f64().unwrap_or(1.0);
-                Some((
-                    unsafe { MmapedSafetensors::new(d.join("adapter_model.safetensors"))? },
-                    scale,
-                ))
-            }
-            None => None,
-        };
+        let lora = lora_dir.map(open_adapter).transpose()?;
         Ok(Self {
             base,
             lora,
+            minus: None,
             prefix,
             dev: dev.clone(),
             dt,
@@ -454,20 +446,81 @@ impl Loader {
         self.raw(name)?.to_dtype(self.dt)?.to_dtype(DType::F32)
     }
     fn lora_pair(&self, module: &str) -> Option<(String, String)> {
-        let (l, _) = self.lora.as_ref()?;
-        for p in [
-            "base_model.model.",
-            "base_model.model.model.",
-            "base_model.model.model.language_model.",
-            "base_model.model.language_model.",
-        ] {
-            let a = format!("{p}{module}.lora_A.weight");
-            if l.get(&a).is_ok() {
-                return Some((a, format!("{p}{module}.lora_B.weight")));
-            }
-        }
-        None
+        pair_in(&self.lora.as_ref()?.0, module)
     }
+    /// The unmerged LoRA of a projection made of `modules` concatenated in this order (as `linear` concatenates them),
+    /// minus the merged adapter's (`minus`), or None when neither touches them. A module the base lacks (a Gemma 4
+    /// global layer's v_proj) is skipped, as `linear` never built it.
+    fn adapter(&self, modules: &[String]) -> Result<Option<Lora>> {
+        let Source::St(base) = &self.base else {
+            candle_core::bail!("an unmerged adapter needs a safetensors base");
+        };
+        let mut parts = Vec::new(); // (out rows, [(A, scale * B)] of this module: its own, then minus the merged one's)
+        for m in modules {
+            let Ok(w) = base.get(&format!("{}{m}.weight", self.prefix)) else {
+                continue;
+            };
+            let mut pairs = Vec::new();
+            for (src, sign) in [(&self.lora, 1.0), (&self.minus, -1.0)] {
+                let Some((l, scale)) = src else { continue };
+                if let Some((a, b)) = pair_in(l, m) {
+                    self.merged.set(self.merged.get() + 1);
+                    let a = l.load(&a, &self.dev)?.to_dtype(DType::F32)?;
+                    let b = (l.load(&b, &self.dev)?.to_dtype(DType::F32)? * (sign * *scale))?;
+                    pairs.push((a, b));
+                }
+            }
+            parts.push((w.shape()[0], pairs));
+        }
+        let rank: usize = parts.iter().flat_map(|(_, p)| p).map(|(a, _)| a.dim(0).unwrap_or(0)).sum();
+        if rank == 0 {
+            return Ok(None);
+        }
+        let a = Tensor::cat(&parts.iter().flat_map(|(_, p)| p).map(|(a, _)| a.clone()).collect::<Vec<_>>(), 0)?;
+        // B block-diagonal: module i's rows hold its B pieces in their own rank columns, zeros elsewhere
+        let (mut rows, mut col) = (Vec::new(), 0);
+        for (out, pairs) in &parts {
+            let z = |n: usize| Tensor::zeros((*out, n), DType::F32, &self.dev);
+            let mut row = vec![z(col)?];
+            for (_, b) in pairs {
+                row.push(b.clone());
+                col += b.dim(1)?;
+            }
+            row.push(z(rank - col)?);
+            rows.push(Tensor::cat(&row, 1)?);
+        }
+        Ok(Some(Lora {
+            a: a.to_dtype(self.dt)?,
+            b: Tensor::cat(&rows, 0)?.to_dtype(self.dt)?,
+        }))
+    }
+}
+
+/// An adapter dir's LoRA tensors and scale (alpha / r).
+fn open_adapter(d: &Path) -> Result<(MmapedSafetensors, f64)> {
+    let acfg = read_json(&d.join("adapter_config.json"))?;
+    let scale = acfg["lora_alpha"].as_f64().unwrap_or(0.0) / acfg["r"].as_f64().unwrap_or(1.0);
+    Ok((unsafe { MmapedSafetensors::new(d.join("adapter_model.safetensors"))? }, scale))
+}
+
+/// The (A, B) tensor names of `module` in an adapter, under whichever PEFT prefix it uses.
+fn pair_in(l: &MmapedSafetensors, module: &str) -> Option<(String, String)> {
+    [
+        "base_model.model.",
+        "base_model.model.model.",
+        "base_model.model.model.language_model.",
+        "base_model.model.language_model.",
+    ]
+    .iter()
+    .map(|p| format!("{p}{module}.lora_A.weight"))
+    .find(|a| l.get(a).is_ok())
+    .map(|a| {
+        let b = a.replace(".lora_A.", ".lora_B.");
+        (a, b)
+    })
+}
+
+impl Loader {
     /// A projection weight with the LoRA folded in: W + scale * B @ A in f32, one rounding to the model dtype. A
     /// GGUF Q8_0 weight without a LoRA stays quantized.
     pub fn weight(&self, module: &str) -> Result<Proj> {
@@ -497,60 +550,10 @@ impl Loader {
                 .collect::<Result<Vec<_>>>()?,
         )
     }
-    /// The unmerged LoRA of a projection made of `modules` concatenated in this order (as `linear` concatenates them),
-    /// or None when the adapter touches none of them. A module the base lacks (a Gemma 4 global layer's v_proj) is
-    /// skipped, as `linear` never built it.
-    fn adapter(&self, modules: &[String]) -> Result<Option<Lora>> {
-        let Some((l, scale)) = &self.lora else {
-            return Ok(None);
-        };
-        let Source::St(base) = &self.base else {
-            candle_core::bail!("an unmerged adapter needs a safetensors base");
-        };
-        let mut parts = Vec::new(); // (out rows, Some((A, B)))
-        for m in modules {
-            let Ok(w) = base.get(&format!("{}{m}.weight", self.prefix)) else {
-                continue;
-            };
-            let pair = match self.lora_pair(m) {
-                Some((a, b)) => {
-                    self.merged.set(self.merged.get() + 1);
-                    let a = l.load(&a, &self.dev)?.to_dtype(DType::F32)?;
-                    let b = (l.load(&b, &self.dev)?.to_dtype(DType::F32)? * *scale)?;
-                    Some((a, b))
-                }
-                None => None,
-            };
-            parts.push((w.shape()[0], pair));
-        }
-        let rank: usize = parts.iter().filter_map(|(_, p)| p.as_ref()).map(|(a, _)| a.dim(0).unwrap_or(0)).sum();
-        if rank == 0 {
-            return Ok(None);
-        }
-        let a = Tensor::cat(&parts.iter().filter_map(|(_, p)| p.as_ref().map(|(a, _)| a.clone())).collect::<Vec<_>>(), 0)?;
-        // B block-diagonal: module i's rows hold its B in its own rank columns, zeros elsewhere
-        let (mut rows, mut col) = (Vec::new(), 0);
-        for (out, p) in &parts {
-            let z = |n: usize| Tensor::zeros((*out, n), DType::F32, &self.dev);
-            rows.push(match p {
-                Some((_, b)) => {
-                    let r = b.dim(1)?;
-                    let row = Tensor::cat(&[z(col)?, b.clone(), z(rank - col - r)?], 1)?;
-                    col += r;
-                    row
-                }
-                None => z(rank)?,
-            });
-        }
-        Ok(Some(Lora {
-            a: a.to_dtype(self.dt)?,
-            b: Tensor::cat(&rows, 0)?.to_dtype(self.dt)?,
-        }))
-    }
     /// Fails when an adapter tensor went unused (a naming mismatch would otherwise serve the base silently).
     pub fn finish(&self) -> Result<usize> {
-        if let Some((l, _)) = &self.lora {
-            let n = l.tensors().len();
+        if self.lora.is_some() || self.minus.is_some() {
+            let n: usize = [&self.lora, &self.minus].iter().filter_map(|x| x.as_ref()).map(|(l, _)| l.tensors().len()).sum();
             if self.merged.get() * 2 != n {
                 candle_core::bail!(
                     "merged {} LoRA pairs but the adapter holds {n} tensors",
@@ -757,8 +760,11 @@ impl Model {
 
     /// This model with `adapter_dir`'s LoRA attached unmerged. The copy shares every base tensor with `self` (candle
     /// tensors are reference counted), so N adapters cost one base plus N small (A, B) sets. Load the base with no LoRA.
-    pub fn with_adapter(&self, base_dir: &Path, adapter_dir: &Path) -> Result<Self> {
-        let ld = Loader::new(base_dir, Some(adapter_dir), self.dt, &self.dev)?;
+    /// `merged`: the adapter already merged into `self`, whose LoRA the attached branch subtracts, so the result is
+    /// exactly base + this adapter: `(W + dM) + (dA - dM)`, one branch of both ranks.
+    pub fn with_adapter(&self, base_dir: &Path, adapter_dir: &Path, merged: Option<&Path>) -> Result<Self> {
+        let mut ld = Loader::new(base_dir, Some(adapter_dir), self.dt, &self.dev)?;
+        ld.minus = merged.map(open_adapter).transpose()?;
         let mut m = self.clone();
         for (i, l) in m.layers.iter_mut().enumerate() {
             let p = format!("layers.{i}");
@@ -784,7 +790,11 @@ impl Model {
         }
         let n = ld.finish()?;
         m.unmerged = true;
-        eprintln!("kev: {} attached unmerged ({n} LoRA pairs)", adapter_dir.display());
+        eprintln!(
+            "kev: {} attached unmerged ({n} LoRA pairs{})",
+            adapter_dir.display(),
+            if merged.is_some() { ", minus the merged adapter" } else { "" }
+        );
         Ok(m)
     }
 
