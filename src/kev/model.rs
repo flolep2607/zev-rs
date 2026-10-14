@@ -63,12 +63,23 @@ struct Layer {
 struct Lora {
     a: Tensor,
     b: Tensor,
+    /// KEV_W8=int8: A as W8, so the down-projection reads the same fused int8 rows as the base GEMM
+    /// (u = (xq Aq^T) sx sA) and the input norms stay fused.
+    aq: Option<Proj>,
 }
 
 impl Lora {
-    /// y + B (A x): the [M, rank] down-projection, then the up-projection added into y in place (kernels::add_matmul_t).
-    fn add_to(&self, y: Tensor, x: &Tensor) -> Result<Tensor> {
-        kernels::add_matmul_t(y, &x.matmul(&self.a.t()?)?, &self.b)
+    /// y + B (A x): the [M, rank] down-projection (from the int8 rows when the base GEMM got them), then the
+    /// up-projection added into y in place (kernels::add_matmul_t).
+    fn add_to(&self, y: Tensor, x: &In) -> Result<Tensor> {
+        let u = match (x, &self.aq) {
+            (In::T(t), _) => t.matmul(&self.a.t()?)?,
+            (In::Q(xq, sx), Some(Proj::W8 { q, s, out, inn, mode })) => {
+                kernels::gemm_w8(xq, sx, q, s, xq.dim(0)?, *out, *inn, *mode)?
+            }
+            (In::Q(..), _) => candle_core::bail!("int8 rows given to a LoRA without an int8 down-projection"),
+        };
+        kernels::add_matmul_t(y, &u, &self.b)
     }
 }
 
@@ -492,6 +503,7 @@ impl Loader {
         Ok(Some(Lora {
             a: a.to_dtype(self.dt)?,
             b: Tensor::cat(&rows, 0)?.to_dtype(self.dt)?,
+            aq: None,
         }))
     }
 }
@@ -789,7 +801,17 @@ impl Model {
             ];
         }
         let n = ld.finish()?;
-        m.unmerged = true;
+        // KEV_W8=int8: give every LoRA an int8 down-projection, so the projections keep their fused int8 rows
+        let mut all_q8 = kernels::w8_mode() == Some(1);
+        for l in m.layers.iter_mut().flat_map(|l| l.lora.iter_mut().flatten()) {
+            let mut p = Proj::Dense(l.a.clone());
+            if all_q8 && p.quantize_w8(1)? {
+                l.aq = Some(p);
+            } else {
+                all_q8 = false;
+            }
+        }
+        m.unmerged = !all_q8;
         eprintln!(
             "kev: {} attached unmerged ({n} LoRA pairs{})",
             adapter_dir.display(),
@@ -798,9 +820,8 @@ impl Model {
         Ok(m)
     }
 
-    /// Whether `p` gets fused int8 rows: KEV_W8=int8 with no unmerged adapter (the LoRA branch needs the bf16 input).
-    /// ponytail: with an adapter the input norms run unfused and each W8 projection quantizes its own rows (one more
-    /// kernel per projection); a LoRA branch reading the int8 rows would win that back.
+    /// Whether `p` gets fused int8 rows: KEV_W8=int8, unless an unmerged LoRA has no int8 down-projection (then it
+    /// needs the bf16 input, and each W8 projection quantizes its own rows).
     fn q8_in(&self, p: &Proj) -> bool {
         !self.unmerged && p.takes_q8()
     }
@@ -1266,13 +1287,12 @@ impl Model {
     }
 }
 
-/// A projection plus its unmerged LoRA, if any (which then gets bf16 input: `Model::q8_in`).
+/// A projection plus its unmerged LoRA, if any.
 fn proj(p: &Proj, lora: &Option<Lora>, x: &In) -> Result<Tensor> {
     let y = p.forward_in(x)?;
-    match (lora, x) {
-        (None, _) => Ok(y),
-        (Some(l), In::T(t)) => l.add_to(y, t),
-        (Some(_), In::Q(..)) => candle_core::bail!("int8 rows given to a projection with an unmerged LoRA"),
+    match lora {
+        None => Ok(y),
+        Some(l) => l.add_to(y, x),
     }
 }
 
