@@ -66,8 +66,9 @@ struct Lora {
 }
 
 impl Lora {
-    fn forward(&self, x: &Tensor) -> Result<Tensor> {
-        x.matmul(&self.a.t()?)?.matmul(&self.b.t()?)
+    /// y + B (A x): the [M, rank] down-projection, then the up-projection added into y in place (kernels::add_matmul_t).
+    fn add_to(&self, y: Tensor, x: &Tensor) -> Result<Tensor> {
+        kernels::add_matmul_t(y, &x.matmul(&self.a.t()?)?, &self.b)
     }
 }
 
@@ -1260,7 +1261,7 @@ fn proj(p: &Proj, lora: &Option<Lora>, x: &In) -> Result<Tensor> {
     let y = p.forward_in(x)?;
     match (lora, x) {
         (None, _) => Ok(y),
-        (Some(l), In::T(t)) => y + l.forward(t)?,
+        (Some(l), In::T(t)) => l.add_to(y, t),
         (Some(_), In::Q(..)) => candle_core::bail!("int8 rows given to a projection with an unmerged LoRA"),
     }
 }

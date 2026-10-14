@@ -896,6 +896,17 @@ pub fn quant_rows(x: &Tensor, mode: i32) -> Result<(Tensor, Tensor)> {
     candle_core::bail!("KEV_W8 needs a CUDA device")
 }
 
+/// y [M, N] + u [M, R] b [N, R]^T, bf16: a LoRA's up-projection added straight into the base projection's output. On
+/// CUDA one cuBLASLt GEMM with beta = 1 writes into y in place (no [M, N] temporary, no separate add: at rank 16 the
+/// LoRA is memory-bound, and those two passes over y cost more than its FLOPs). Elsewhere `y + u b^T`.
+pub fn add_matmul_t(y: Tensor, u: &Tensor, b: &Tensor) -> Result<Tensor> {
+    #[cfg(feature = "cuda")]
+    if is_cuda(&y) && y.dtype() == DType::BF16 && y.rank() == 2 && y.is_contiguous() {
+        return cu::add_matmul_t(y, u, b);
+    }
+    y + u.matmul(&b.t()?)?
+}
+
 /// x [M, K] times w [N, K]^T, both from quant_rows (scales sx [M], sw [N]) -> y [M, N] bf16.
 #[allow(clippy::too_many_arguments)]
 pub fn gemm_w8(
@@ -2083,6 +2094,84 @@ mod cu {
         };
         if code != 0 {
             candle_core::bail!("cutlass int8 gemm m={m} n={n} k={k} tile={tile}: code {code}");
+        }
+        Ok(y)
+    }
+
+    /// y += u b^T in place, in cuBLASLt's column-major terms: Y [N, M] = op_T(B as [R, N]) * (U as [R, M]) + 1 * Y.
+    /// ponytail: writes into `y`'s buffer, which the caller owns alone (a projection output made just before).
+    pub fn add_matmul_t(y: Tensor, u: &Tensor, b: &Tensor) -> Result<Tensor> {
+        use candle_core::cuda_backend::cudarc::cublaslt::{result as lt, sys};
+        use std::ffi::c_void;
+        let candle_core::Device::Cuda(d) = y.device() else {
+            unreachable!()
+        };
+        let (u, b) = (u.contiguous()?, b.contiguous()?);
+        let (m, n) = y.dims2()?;
+        let r = b.dim(1)?;
+        if u.dims2()? != (m, r) || b.dim(0)? != n || u.dtype() != DType::BF16 || b.dtype() != DType::BF16 {
+            candle_core::bail!("add_matmul_t: y {:?} u {:?} b {:?}", y.shape(), u.shape(), b.shape());
+        }
+        if m == 0 {
+            return Ok(y);
+        }
+        let e = candle_core::Error::wrap;
+        let (h, ws, ws_size) = lt_handle(d)?;
+        let h = h as sys::cublasLtHandle_t;
+        let (one, yp, up, bp) = (1f32, ptr(&y)?, ptr(&u)?, ptr(&b)?);
+        unsafe {
+            let desc = lt::create_matmul_desc(
+                sys::cublasComputeType_t::CUBLAS_COMPUTE_32F,
+                sys::cudaDataType::CUDA_R_32F,
+            )
+            .map_err(e)?;
+            let op_t: i32 = 1;
+            lt::set_matmul_desc_attribute(
+                desc,
+                sys::cublasLtMatmulDescAttributes_t::CUBLASLT_MATMUL_DESC_TRANSA,
+                &op_t as *const _ as *const c_void,
+                std::mem::size_of_val(&op_t),
+            )
+            .map_err(e)?;
+            let bf = sys::cudaDataType::CUDA_R_16BF;
+            let la = lt::create_matrix_layout(bf, r as u64, n as u64, r as i64).map_err(e)?;
+            let lb = lt::create_matrix_layout(bf, r as u64, m as u64, r as i64).map_err(e)?;
+            let lc = lt::create_matrix_layout(bf, n as u64, m as u64, n as i64).map_err(e)?;
+            let pref = lt::create_matmul_pref().map_err(e)?;
+            let wsz = ws_size as u64;
+            lt::set_matmul_pref_attribute(
+                pref,
+                sys::cublasLtMatmulPreferenceAttributes_t::CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                &wsz as *const u64 as *const c_void,
+                8,
+            )
+            .map_err(e)?;
+            let res = lt::get_matmul_algo_heuristic(h, desc, la, lb, lc, lc, pref).and_then(|heur| {
+                lt::matmul(
+                    h,
+                    desc,
+                    &one as *const f32 as *const c_void,
+                    &one as *const f32 as *const c_void,
+                    bp as *const c_void,
+                    la,
+                    up as *const c_void,
+                    lb,
+                    yp as *const c_void,
+                    lc,
+                    yp as *mut c_void,
+                    lc,
+                    &heur.algo,
+                    ws as *mut c_void,
+                    ws_size,
+                    d.cuda_stream().cu_stream() as sys::cudaStream_t,
+                )
+            });
+            let _ = lt::destroy_matmul_pref(pref);
+            let _ = lt::destroy_matrix_layout(lc);
+            let _ = lt::destroy_matrix_layout(lb);
+            let _ = lt::destroy_matrix_layout(la);
+            let _ = lt::destroy_matmul_desc(desc);
+            res.map_err(|err| candle_core::Error::Msg(format!("cublasLt lora add m={m} n={n} r={r}: {err:?}")))?;
         }
         Ok(y)
     }
