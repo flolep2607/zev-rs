@@ -1,7 +1,8 @@
 //! `zev serve --model <dir | hub id[@revision]>`: find the checkpoint (the local Hugging Face cache, downloading what
 //! is missing), tell its family from the files it ships, and load it on each device.
 //!
-//! - head.pt / head.safetensors next to an adapter: Kev (the base named by the head's metadata, LoRA merged);
+//! - head.pt / head.safetensors next to an adapter: Kev (the base named by the head's metadata, LoRA merged; several
+//!   Kev adapters on the same base share one copy of it, each LoRA unmerged: `load_all`);
 //! - pointer_head.safetensors next to backbone/: a pre-merged Kev (NeoHorse);
 //! - decider_config.json: decider (and its fine-tunes);
 //! - jevk5_config.json: JevK5.
@@ -145,40 +146,13 @@ pub fn load(spec: &str, o: &LoadOpts) -> Res<Served> {
     let dtype = format!("{:?}", o.dtype).to_lowercase();
     let has = |f: &str| dir.join(f).exists();
     let mut workers = Vec::new();
-    let (entrant, mut names, card) = if (has("head.pt") || has("head.safetensors"))
-        && has("adapter_config.json")
-    {
+    let (entrant, mut names, card) = if let Some((base_spec, base)) = kev_base(&dir)? {
         // Kev: the base the head was trained on, with the adapter merged
-        let meta = PointerHead::load(&dir, o.temperature, &Device::Cpu)?;
-        let head_meta = super::convert::head_pt(&dir.join("head.pt"))
-            .map(|(_, m)| m)
-            .unwrap_or_default();
-        let acfg = read_json(&dir.join("adapter_config.json"))?;
-        let base_name = head_meta["base"]
-            .as_str()
-            .or(acfg["base_model_name_or_path"].as_str())
-            .ok_or("kev: no base model named")?
-            .to_string();
-        let base_spec = match head_meta["base_revision"].as_str() {
-            Some(r) => format!("{base_name}@{r}"),
-            None => base_name.clone(),
-        };
-        let base = resolve(&base_spec)?;
+        let mut models = Vec::new();
         for &d in &o.devices {
-            let dev = device(d)?;
-            let m = Model::load(&base, Some(&dir), o.dtype, &dev)?;
-            workers.push((
-                m,
-                Readout::Pointer(PointerHead::load(&dir, o.temperature, &dev)?),
-            ));
+            models.push(Model::load(&base, Some(&dir), o.dtype, &device(d)?)?);
         }
-        let card = json!({"description": format!("Kev pointer head on {base_spec}, Candle backend, temperature {:.2}", meta.temperature),
-                          "backend": "candle", "dtype": dtype, "temperature": meta.temperature});
-        (
-            Entrant::Kev(Encoder::new(tokenizer(&base)?)?),
-            vec!["kev-latest".to_string(), "jev-latest".to_string()],
-            card,
-        )
+        return kev_served(spec, &dir, &base_spec, &base, models, "merged", o, t0);
     } else if has("pointer_head.safetensors") && has("backbone/config.json") {
         let meta = PointerHead::load(&dir, o.temperature, &Device::Cpu)?;
         for &d in &o.devices {
@@ -285,6 +259,90 @@ pub fn load(spec: &str, o: &LoadOpts) -> Res<Served> {
         t0.elapsed().as_secs_f64()
     );
     Ok(spawn(workers, entrant, names, o.serve.clone(), card))
+}
+
+/// A Kev checkpoint (a pointer head next to an adapter): the base the head was trained on, as a spec and a local dir.
+fn kev_base(dir: &Path) -> Res<Option<(String, PathBuf)>> {
+    let has = |f: &str| dir.join(f).exists();
+    if !((has("head.pt") || has("head.safetensors")) && has("adapter_config.json")) {
+        return Ok(None);
+    }
+    let head_meta = super::convert::head_pt(&dir.join("head.pt"))
+        .map(|(_, m)| m)
+        .unwrap_or_default();
+    let acfg = read_json(&dir.join("adapter_config.json"))?;
+    let base_name = head_meta["base"]
+        .as_str()
+        .or(acfg["base_model_name_or_path"].as_str())
+        .ok_or("kev: no base model named")?
+        .to_string();
+    let base_spec = match head_meta["base_revision"].as_str() {
+        Some(r) => format!("{base_name}@{r}"),
+        None => base_name,
+    };
+    let base = resolve(&base_spec)?;
+    Ok(Some((base_spec, base)))
+}
+
+/// Serve Kev backbones (one per device, `--devices` order) with `dir`'s pointer head.
+#[allow(clippy::too_many_arguments)]
+fn kev_served(
+    spec: &str,
+    dir: &Path,
+    base_spec: &str,
+    base: &Path,
+    models: Vec<Model>,
+    how: &str,
+    o: &LoadOpts,
+    t0: std::time::Instant,
+) -> Res<Served> {
+    let meta = PointerHead::load(dir, o.temperature, &Device::Cpu)?;
+    let mut workers = Vec::new();
+    for m in models {
+        let head = PointerHead::load(dir, o.temperature, &m.dev)?;
+        workers.push((m, Readout::Pointer(head)));
+    }
+    let dtype = format!("{:?}", o.dtype).to_lowercase();
+    let card = json!({"description": format!("Kev pointer head on {base_spec} (LoRA {how}), Candle backend, temperature {:.2}", meta.temperature),
+                      "backend": "candle", "dtype": dtype, "temperature": meta.temperature});
+    let names = vec!["kev-latest".to_string(), "jev-latest".to_string(), spec.to_string()];
+    eprintln!(
+        "zev: loaded {spec} ({}) x{} in {:.1}s as {names:?}",
+        dir.display(),
+        workers.len(),
+        t0.elapsed().as_secs_f64()
+    );
+    Ok(spawn(workers, Entrant::Kev(Encoder::new(tokenizer(base)?)?), names, o.serve.clone(), card))
+}
+
+/// Every `--model`, in order (the first answers unknown names). Kev adapters that share a base load it once per device
+/// and attach each LoRA unmerged (`Model::with_adapter`): N adapters cost one base plus N small (A, B) sets, against N
+/// merged backbones. A lone Kev on its base stays merged (the fused int8 path).
+pub fn load_all(specs: &[String], o: &LoadOpts) -> Res<Vec<Served>> {
+    let dirs: Vec<PathBuf> = specs.iter().map(|s| resolve(s)).collect::<Res<_>>()?;
+    let bases: Vec<Option<(String, PathBuf)>> = dirs.iter().map(|d| kev_base(d)).collect::<Res<_>>()?;
+    let shared = |b: &Path| bases.iter().flatten().filter(|(_, x)| x == b).count() > 1;
+    let mut loaded: Vec<(PathBuf, Vec<Model>)> = Vec::new(); // one unmerged base per device, per base dir
+    let mut out = Vec::new();
+    for ((spec, dir), base) in specs.iter().zip(&dirs).zip(&bases) {
+        let t0 = std::time::Instant::now();
+        match base {
+            Some((base_spec, b)) if shared(b) => {
+                if !loaded.iter().any(|(x, _)| x == b) {
+                    let mut ms = Vec::new();
+                    for &d in &o.devices {
+                        ms.push(Model::load(b, None, o.dtype, &device(d)?)?);
+                    }
+                    loaded.push((b.clone(), ms));
+                }
+                let (_, ms) = loaded.iter().find(|(x, _)| x == b).unwrap();
+                let models = ms.iter().map(|m| m.with_adapter(b, dir)).collect::<candle_core::Result<Vec<_>>>()?;
+                out.push(kev_served(spec, dir, base_spec, b, models, "unmerged, shared base", o, t0)?);
+            }
+            _ => out.push(load(spec, o)?),
+        }
+    }
+    Ok(out)
 }
 
 /// Intern-Decision ships its runtime as inference.py: its MODEL_NAME and DEFAULT_TEMPERATURE.

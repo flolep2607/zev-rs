@@ -113,7 +113,8 @@ enum Commands {
         temperature: Option<f64>,
 
         /// Serve a model on the Candle backend: a checkpoint dir or a Hub id[@revision] (repeat to serve several; the
-        /// request's `model` picks one, the first is the default). The family (Kev, decider, JevK5) is detected.
+        /// request's `model` picks one, the first is the default). The family (Kev, decider, JevK5) is detected. Kev
+        /// adapters on the same base share one copy of it (LoRAs unmerged); the request's `model` is the spec as given.
         #[cfg(feature = "candle")]
         #[arg(long = "model")]
         models: Vec<String>,
@@ -476,9 +477,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let (Some(kev), Some(base)) = (&kev, &base) {
                     served.push(load::load_kev(kev, base, head.as_ref().unwrap_or(kev), &o)?);
                 }
-                for m in &models {
-                    served.push(load::load(m, &o)?);
-                }
+                served.extend(load::load_all(&models, &o)?);
                 zev::kev::serve::router(served)
             } else {
                 create_router(Arc::new(ZevEngine::new(temperature)))

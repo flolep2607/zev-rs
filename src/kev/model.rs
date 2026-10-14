@@ -6,7 +6,9 @@
 //! - `gemma4` / `gemma4_text` / `gemma4_unified(_text)`: Gemma 4 dense text (`modeling_gemma4.py`: plain-w norms, value
 //!   norm, attention scale 1, k = v on global layers with their own head size, proportional RoPE, layer scalars).
 //!
-//! An optional LoRA is merged on load. Precision follows the bf16 reference paths: weights `round(W + scale * B @ A)`
+//! An optional LoRA is merged on load, or kept unmerged next to a shared base (`Model::with_adapter`: several adapters
+//! over one copy of the base weights, each its own `Model` value whose tensors point at the same device buffers).
+//! An unmerged LoRA adds `scale * B @ A @ x` in the model dtype after the base projection. Precision follows the bf16 reference paths: weights `round(W + scale * B @ A)`
 //! (delta in f32), the residual stream and projections in the model dtype, norms, attention and the DeltaNet
 //! recurrence in f32 math, rounded where the reference rounds.
 
@@ -17,6 +19,7 @@ use candle_core::{DType, Device, Result, Tensor};
 use serde_json::Value;
 use std::path::Path;
 
+#[derive(Clone)]
 struct Gdn {
     spec: GdnSpec,
     lg: usize,
@@ -28,17 +31,20 @@ struct Gdn {
     out: Proj,
 }
 
+#[derive(Clone)]
 struct Attn {
     spec: AttnSpec,
     qkv: Proj, // q (with its gate) | k | v
     o: Proj,
 }
 
+#[derive(Clone)]
 enum Mixer {
     Gdn(Gdn),
     Attn(Attn),
 }
 
+#[derive(Clone)]
 struct Layer {
     in_norm: Tensor,
     post_mix: Option<Tensor>, // Gemma: norm of the mixer output before the residual add
@@ -48,8 +54,24 @@ struct Layer {
     mixer: Mixer,
     gate_up: Proj,
     down: Proj,
+    lora: [Option<Lora>; 4], // unmerged adapter of: the mixer's input projection, its output, gate_up, down
 }
 
+/// An unmerged LoRA of one (possibly concatenated) projection: A [rank * modules, in], B [out, rank * modules]
+/// block-diagonal with the scale folded in, both in the model dtype.
+#[derive(Clone)]
+struct Lora {
+    a: Tensor,
+    b: Tensor,
+}
+
+impl Lora {
+    fn forward(&self, x: &Tensor) -> Result<Tensor> {
+        x.matmul(&self.a.t()?)?.matmul(&self.b.t()?)
+    }
+}
+
+#[derive(Clone)]
 pub struct Model {
     pub model_type: String,
     pub hidden: usize,
@@ -66,11 +88,14 @@ pub struct Model {
     layers: Vec<Layer>,
     norm: Tensor,
     pub cache: CacheShape,
+    /// An unmerged adapter is attached: its projections take bf16 input (no fused int8 rows), so the LoRA sees it.
+    unmerged: bool,
 }
 
 /// A projection weight [out, in]: dense in the model dtype, or GGUF Q8_0 kept quantized on the device (int8 values
 /// and f32 block scales). With f32 activations a Q8_0 weight is applied as ggml-cuda applies it (activations
 /// quantized to q8_1, int8 tensor-core dot products); in bf16 it is dequantized for each use.
+#[derive(Clone)]
 pub enum Proj {
     Dense(Tensor),
     Q8 {
@@ -471,6 +496,56 @@ impl Loader {
                 .collect::<Result<Vec<_>>>()?,
         )
     }
+    /// The unmerged LoRA of a projection made of `modules` concatenated in this order (as `linear` concatenates them),
+    /// or None when the adapter touches none of them. A module the base lacks (a Gemma 4 global layer's v_proj) is
+    /// skipped, as `linear` never built it.
+    fn adapter(&self, modules: &[String]) -> Result<Option<Lora>> {
+        let Some((l, scale)) = &self.lora else {
+            return Ok(None);
+        };
+        let Source::St(base) = &self.base else {
+            candle_core::bail!("an unmerged adapter needs a safetensors base");
+        };
+        let mut parts = Vec::new(); // (out rows, Some((A, B)))
+        for m in modules {
+            let Ok(w) = base.get(&format!("{}{m}.weight", self.prefix)) else {
+                continue;
+            };
+            let pair = match self.lora_pair(m) {
+                Some((a, b)) => {
+                    self.merged.set(self.merged.get() + 1);
+                    let a = l.load(&a, &self.dev)?.to_dtype(DType::F32)?;
+                    let b = (l.load(&b, &self.dev)?.to_dtype(DType::F32)? * *scale)?;
+                    Some((a, b))
+                }
+                None => None,
+            };
+            parts.push((w.shape()[0], pair));
+        }
+        let rank: usize = parts.iter().filter_map(|(_, p)| p.as_ref()).map(|(a, _)| a.dim(0).unwrap_or(0)).sum();
+        if rank == 0 {
+            return Ok(None);
+        }
+        let a = Tensor::cat(&parts.iter().filter_map(|(_, p)| p.as_ref().map(|(a, _)| a.clone())).collect::<Vec<_>>(), 0)?;
+        // B block-diagonal: module i's rows hold its B in its own rank columns, zeros elsewhere
+        let (mut rows, mut col) = (Vec::new(), 0);
+        for (out, p) in &parts {
+            let z = |n: usize| Tensor::zeros((*out, n), DType::F32, &self.dev);
+            rows.push(match p {
+                Some((_, b)) => {
+                    let r = b.dim(1)?;
+                    let row = Tensor::cat(&[z(col)?, b.clone(), z(rank - col - r)?], 1)?;
+                    col += r;
+                    row
+                }
+                None => z(rank)?,
+            });
+        }
+        Ok(Some(Lora {
+            a: a.to_dtype(self.dt)?,
+            b: Tensor::cat(&rows, 0)?.to_dtype(self.dt)?,
+        }))
+    }
     /// Fails when an adapter tensor went unused (a naming mismatch would otherwise serve the base silently).
     pub fn finish(&self) -> Result<usize> {
         if let Some((l, _)) = &self.lora {
@@ -679,6 +754,46 @@ impl Model {
         Ok(m)
     }
 
+    /// This model with `adapter_dir`'s LoRA attached unmerged. The copy shares every base tensor with `self` (candle
+    /// tensors are reference counted), so N adapters cost one base plus N small (A, B) sets. Load the base with no LoRA.
+    pub fn with_adapter(&self, base_dir: &Path, adapter_dir: &Path) -> Result<Self> {
+        let ld = Loader::new(base_dir, Some(adapter_dir), self.dt, &self.dev)?;
+        let mut m = self.clone();
+        for (i, l) in m.layers.iter_mut().enumerate() {
+            let p = format!("layers.{i}");
+            let mods = |names: &[&str], under: &str| -> Vec<String> {
+                names.iter().map(|n| format!("{p}.{under}.{n}")).collect()
+            };
+            let (input, output) = match &l.mixer {
+                Mixer::Gdn(_) => (
+                    mods(&["in_proj_qkv", "in_proj_z", "in_proj_b", "in_proj_a"], "linear_attn"),
+                    mods(&["out_proj"], "linear_attn"),
+                ),
+                Mixer::Attn(_) => (
+                    mods(&["q_proj", "k_proj", "v_proj"], "self_attn"),
+                    mods(&["o_proj"], "self_attn"),
+                ),
+            };
+            l.lora = [
+                ld.adapter(&input)?,
+                ld.adapter(&output)?,
+                ld.adapter(&mods(&["gate_proj", "up_proj"], "mlp"))?,
+                ld.adapter(&mods(&["down_proj"], "mlp"))?,
+            ];
+        }
+        let n = ld.finish()?;
+        m.unmerged = true;
+        eprintln!("kev: {} attached unmerged ({n} LoRA pairs)", adapter_dir.display());
+        Ok(m)
+    }
+
+    /// Whether `p` gets fused int8 rows: KEV_W8=int8 with no unmerged adapter (the LoRA branch needs the bf16 input).
+    /// ponytail: with an adapter the input norms run unfused and each W8 projection quantizes its own rows (one more
+    /// kernel per projection); a LoRA branch reading the int8 rows would win that back.
+    fn q8_in(&self, p: &Proj) -> bool {
+        !self.unmerged && p.takes_q8()
+    }
+
     fn qwen35(ld: &Loader, cfg: &Value, full: &Value) -> Result<Self> {
         let (dt, dev) = (ld.dt, &ld.dev);
         let hidden = u(cfg, "hidden_size")?;
@@ -770,6 +885,7 @@ impl Model {
                 mixer,
                 gate_up: ld.linear(&["gate_proj", "up_proj"].map(|s| format!("{p}.mlp.{s}")))?,
                 down: ld.weight(&format!("{p}.mlp.down_proj"))?,
+                lora: Default::default(),
             });
         }
         let tied = full["tie_word_embeddings"]
@@ -797,6 +913,7 @@ impl Model {
                 rec: hv * DK * DV,
                 kv: la * nkv * hd,
             },
+            unmerged: false,
         })
     }
 
@@ -953,6 +1070,7 @@ impl Model {
                 }),
                 gate_up: ld.linear(&["gate_proj", "up_proj"].map(|s| format!("{p}.mlp.{s}")))?,
                 down: ld.weight(&format!("{p}.mlp.down_proj"))?,
+                lora: Default::default(),
             });
         }
         let tied = full["tie_word_embeddings"]
@@ -996,6 +1114,7 @@ impl Model {
                 rec: 0,
                 kv: kv_off,
             },
+            unmerged: false,
         })
     }
 
@@ -1023,7 +1142,7 @@ impl Model {
         if let Some(s) = self.embed_scale {
             x = (x * s)?;
         }
-        let mut h = if mixer_in(&self.layers[0].mixer).takes_q8() {
+        let mut h = if self.q8_in(mixer_in(&self.layers[0].mixer)) {
             let (_, q, s) =
                 kernels::add_norm_q8(&x, None, Some(&self.layers[0].in_norm), eps, mode, 1.0)?;
             In::Q(q, s)
@@ -1034,7 +1153,7 @@ impl Model {
         let nl = self.layers.len();
         for (i, l) in self.layers.iter().enumerate() {
             let last = i + 1 == nl;
-            let Some(core) = self.mixer(&l.mixer, &h, pack, last && picks.is_empty(), !last)?
+            let Some(core) = self.mixer(l, &h, pack, last && picks.is_empty(), !last)?
             else {
                 break;
             };
@@ -1050,13 +1169,13 @@ impl Model {
                 (core, x)
             };
             let mut mixed = match &l.mixer {
-                Mixer::Gdn(g) => g.out.forward_in(&core)?,
-                Mixer::Attn(a) => a.o.forward_in(&core)?,
+                Mixer::Gdn(g) => proj(&g.out, &l.lora[1], &core)?,
+                Mixer::Attn(a) => proj(&a.o, &l.lora[1], &core)?,
             };
             if let Some(w) = &l.post_mix {
                 mixed = kernels::add_norm(&mixed, None, Some(w), eps, mode, 1.0)?.1;
             }
-            let (xn, hn) = if l.gate_up.takes_q8() {
+            let (xn, hn) = if self.q8_in(&l.gate_up) {
                 let (xn, q, s) =
                     kernels::add_norm_q8(&xr, Some(&mixed), Some(&l.pre_mlp), eps, mode, 1.0)?;
                 (xn, In::Q(q, s))
@@ -1065,15 +1184,15 @@ impl Model {
                     kernels::add_norm(&xr, Some(&mixed), Some(&l.pre_mlp), eps, mode, 1.0)?;
                 (xn, In::T(hn))
             };
-            let gu = l.gate_up.forward_in(&hn)?;
-            let act = if l.down.takes_q8() {
+            let gu = proj(&l.gate_up, &l.lora[2], &hn)?;
+            let act = if self.q8_in(&l.down) {
                 let (q, s) = kernels::act_mul_q8(&gu, self.act, self.round_act)?;
                 In::Q(q, s)
             } else {
                 In::T(kernels::act_mul(&gu, self.act, self.round_act)?)
             };
             drop(gu);
-            let mut m = l.down.forward_in(&act)?;
+            let mut m = proj(&l.down, &l.lora[3], &act)?;
             if let Some(w) = &l.post_mlp {
                 m = kernels::add_norm(&m, None, Some(w), eps, mode, 1.0)?.1;
             }
@@ -1086,7 +1205,7 @@ impl Model {
                 let (_, hn2) = kernels::add_norm(&xn, Some(&m), Some(next), eps, mode, l.scalar)?;
                 return hn2.to_dtype(DType::F32);
             }
-            let (xn2, hn2) = if mixer_in(&self.layers[i + 1].mixer).takes_q8() {
+            let (xn2, hn2) = if self.q8_in(mixer_in(&self.layers[i + 1].mixer)) {
                 let (xn2, q, s) =
                     kernels::add_norm_q8(&xn, Some(&m), Some(next), eps, mode, l.scalar)?;
                 (xn2, In::Q(q, s))
@@ -1103,21 +1222,21 @@ impl Model {
     /// The mixer's output for its output projection: int8 rows when `q8_out` and that projection takes them.
     fn mixer(
         &self,
-        m: &Mixer,
+        l: &Layer,
         h: &In,
         pack: &Pack,
         cache_only: bool,
         q8_out: bool,
     ) -> Result<Option<In>> {
-        Ok(match m {
+        Ok(match &l.mixer {
             Mixer::Gdn(g) => {
-                let p = g.proj.forward_in(h)?;
+                let p = proj(&g.proj, &l.lora[0], h)?;
                 let o =
                     kernels::conv_gdn(&p, &g.conv_w, &g.a_neg, &g.dt_bias, pack, &g.spec, g.lg)?;
                 if cache_only {
                     return Ok(None);
                 }
-                if q8_out && g.out.takes_q8() {
+                if q8_out && self.q8_in(&g.out) {
                     let (q, s) = kernels::gated_norm_q8(&o, &p, &g.norm_w, &g.spec)?;
                     Some(In::Q(q, s))
                 } else {
@@ -1125,7 +1244,7 @@ impl Model {
                 }
             }
             Mixer::Attn(a) => {
-                let p = a.qkv.forward_in(h)?;
+                let p = proj(&a.qkv, &l.lora[0], h)?;
                 let (q, k, v) = kernels::qkv_prep(&p, pack, &a.spec)?;
                 if cache_only {
                     return Ok(None);
@@ -1133,6 +1252,16 @@ impl Model {
                 Some(In::T(kernels::attention(&q, &k, &v, &p, pack, &a.spec)?))
             }
         })
+    }
+}
+
+/// A projection plus its unmerged LoRA, if any (which then gets bf16 input: `Model::q8_in`).
+fn proj(p: &Proj, lora: &Option<Lora>, x: &In) -> Result<Tensor> {
+    let y = p.forward_in(x)?;
+    match (lora, x) {
+        (None, _) => Ok(y),
+        (Some(l), In::T(t)) => y + l.forward(t)?,
+        (Some(_), In::Q(..)) => candle_core::bail!("int8 rows given to a projection with an unmerged LoRA"),
     }
 }
 
