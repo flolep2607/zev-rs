@@ -36,6 +36,9 @@ fn build_w8_gemm() {
             "arch=compute_86,code=sm_86",
             "-gencode",
             "arch=compute_89,code=sm_89",
+            // PTX too, JIT-compiled on newer cards (an RTX PRO 6000, sm_120) that the cubins above do not cover
+            "-gencode",
+            "arch=compute_89,code=compute_89",
         ])
         .arg(format!("-I{cutlass}/include"))
         .args(["-c", "csrc/w8_gemm.cu", "-o"])
