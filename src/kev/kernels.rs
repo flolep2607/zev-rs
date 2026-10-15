@@ -1738,7 +1738,7 @@ mod cu {
         };
         launch(
             x,
-            "add_norm_q8_bf16",
+            if vec_ok(h) { "add_norm_q8v_bf16" } else { "add_norm_q8_bf16" },
             (n as u32, 1, 1),
             256,
             0,
@@ -1757,6 +1757,11 @@ mod cu {
         )?;
         Ok((xo, q, s))
     }
+    /// The 8-wide vectorized q8 kernels apply to rows that are multiples of 8 (KEV_VEC=0 keeps the scalar ones).
+    fn vec_ok(width: usize) -> bool {
+        static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        width % 8 == 0 && *ON.get_or_init(|| std::env::var("KEV_VEC").map_or(true, |v| v != "0"))
+    }
     pub fn act_mul_q8(gu: &Tensor, act: Act, round_act: bool) -> Result<(Tensor, Tensor)> {
         let (n, i2) = gu.dims2()?;
         let i = i2 / 2;
@@ -1767,7 +1772,7 @@ mod cu {
         let (s, ps) = out(gu, &[n], DType::F32)?;
         launch(
             gu,
-            "act_mul_q8_bf16",
+            if vec_ok(i) { "act_mul_q8v_bf16" } else { "act_mul_q8_bf16" },
             (n as u32, 1, 1),
             512,
             0,

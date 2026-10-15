@@ -1966,6 +1966,111 @@ extern "C" __global__ void __launch_bounds__(512) act_mul_q8_bf16(const bf16* gu
     }
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// Vectorized q8 elementwise kernels: each thread moves 8 contiguous values per 16-byte load (8-byte int8 store).
+// Same per-element arithmetic as add_norm_q8_bf16 / act_mul_q8_bf16; the scalar versions moved 2-byte loads and
+// 1-byte stores and ran 3-4x under memory bandwidth (KEV_PROF, molab RTX PRO 6000). Rows must be multiples of 8.
+// ---------------------------------------------------------------------------------------------------------------
+// ld8 / st8 (8 bf16 in one 16-byte load / store) are defined above, with the q8 GEMM helpers.
+__device__ __forceinline__ void st8q(signed char* p, const float f[8], float inv) {
+    unsigned w[2] = {0u, 0u};
+#pragma unroll
+    for (int k = 0; k < 8; k++) w[k >> 2] |= ((unsigned)(unsigned char)q127(f[k], inv)) << (8 * (k & 3));
+    *reinterpret_cast<uint2*>(p) = make_uint2(w[0], w[1]);
+}
+
+// add_norm_q8_bf16 with 8-wide vectors: block of 256 per token, H % 8 == 0, H <= 256 * 8 * AV_MAX.
+#define AV_MAX 2
+extern "C" __global__ void __launch_bounds__(256) add_norm_q8v_bf16(const bf16* x, const bf16* m, const float* w, bf16* xo, signed char* q,
+                                                                    float* qs, int H, float eps, int rounded, float scale) {
+    const long row = (long)blockIdx.x * H;
+    const int nv = H >> 3;
+    float sv[AV_MAX][8], ss = 0.f;
+#pragma unroll
+    for (int k = 0; k < AV_MAX; k++) {
+        const int v = threadIdx.x + 256 * k;
+        if (v < nv) {
+            float a[8];
+            ld8(x + row + 8 * v, a);
+            if (m) {
+                float b[8];
+                ld8(m + row + 8 * v, b);
+#pragma unroll
+                for (int e = 0; e < 8; e++) {
+                    a[e] = rnd<bf16>(a[e] + b[e]);
+                    if (scale != 1.f) a[e] = rnd<bf16>(a[e] * scale);
+                }
+            }
+#pragma unroll
+            for (int e = 0; e < 8; e++) { sv[k][e] = a[e]; ss += a[e] * a[e]; }
+        }
+    }
+    ss = block_sum(ss);
+    const float r = rsqrtf(ss / H + eps);
+    float amax = 0.f;
+#pragma unroll
+    for (int k = 0; k < AV_MAX; k++) {
+        const int v = threadIdx.x + 256 * k;
+        if (v < nv) {
+            if (m) st8(xo + row + 8 * v, sv[k]);
+            float wi[8];
+            if (w) {
+                const float4 w0 = *reinterpret_cast<const float4*>(w + 8 * v), w1 = *reinterpret_cast<const float4*>(w + 8 * v + 4);
+                wi[0] = w0.x; wi[1] = w0.y; wi[2] = w0.z; wi[3] = w0.w; wi[4] = w1.x; wi[5] = w1.y; wi[6] = w1.z; wi[7] = w1.w;
+            } else {
+#pragma unroll
+                for (int e = 0; e < 8; e++) wi[e] = 1.f;
+            }
+#pragma unroll
+            for (int e = 0; e < 8; e++) {
+                sv[k][e] = bf2f(f2bf(rounded ? rnd<bf16>(sv[k][e] * r) * wi[e] : sv[k][e] * r * wi[e]));
+                amax = fmaxf(amax, fabsf(sv[k][e]));
+            }
+        }
+    }
+    amax = block_max_all(amax);
+    const float sc = amax > 0.f ? amax / 127.f : 1.f, inv = 1.f / sc;
+    if (threadIdx.x == 0) qs[blockIdx.x] = sc;
+#pragma unroll
+    for (int k = 0; k < AV_MAX; k++) {
+        const int v = threadIdx.x + 256 * k;
+        if (v < nv) st8q(q + row + 8 * v, sv[k], inv);
+    }
+}
+
+// act_mul_q8_bf16 with 8-wide vectors: block of 512 per token, I % 8 == 0, I <= 512 * 8 * MV_MAX.
+#define MV_MAX 3
+extern "C" __global__ void __launch_bounds__(512) act_mul_q8v_bf16(const bf16* gu, signed char* q, float* qs, int I, int gelu, int round_act) {
+    const long t = blockIdx.x;
+    const int nv = I >> 3;
+    float av[MV_MAX][8], amax = 0.f;
+#pragma unroll
+    for (int k = 0; k < MV_MAX; k++) {
+        const int v = threadIdx.x + 512 * k;
+        if (v < nv) {
+            float g[8], u[8];
+            ld8(gu + t * 2 * I + 8 * v, g);
+            ld8(gu + t * 2 * I + I + 8 * v, u);
+#pragma unroll
+            for (int e = 0; e < 8; e++) {
+                float a = gelu ? 0.5f * g[e] * (1.f + tanhf(0.7978845608028654f * (g[e] + 0.044715f * g[e] * g[e] * g[e])))
+                               : g[e] / (1.f + expf(-g[e]));
+                if (round_act) a = rnd<bf16>(a);
+                av[k][e] = bf2f(f2bf(a * u[e]));
+                amax = fmaxf(amax, fabsf(av[k][e]));
+            }
+        }
+    }
+    amax = block_max_all(amax);
+    const float sc = amax > 0.f ? amax / 127.f : 1.f, inv = 1.f / sc;
+    if (threadIdx.x == 0) qs[t] = sc;
+#pragma unroll
+    for (int k = 0; k < MV_MAX; k++) {
+        const int v = threadIdx.x + 512 * k;
+        if (v < nv) st8q(q + t * I + 8 * v, av[k], inv);
+    }
+}
+
 // gated_norm_bf16 as one block per token, warp h = value head h (blockDim = 32 HV <= 1024), writing the token's
 // HV * DV outputs as int8 + one scale.
 extern "C" __global__ void __launch_bounds__(1024) gated_norm_q8_bf16(const float* o, const bf16* p, int ld, int z_off, const float* w,
