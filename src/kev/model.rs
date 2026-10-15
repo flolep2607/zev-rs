@@ -1170,17 +1170,21 @@ impl Model {
     /// written.
     pub fn forward(&self, pack: &Pack, ids: &[u32], picks: &[u32]) -> Result<Tensor> {
         let (mode, eps) = (self.norm_mode, self.eps);
-        let mut x = self.embed.rows_at(ids, self.dt)?;
-        if let Some(s) = self.embed_scale {
-            x = (x * s)?;
-        }
-        let mut h = if self.q8_in(mixer_in(&self.layers[0].mixer)) {
-            let (_, q, s) =
-                kernels::add_norm_q8(&x, None, Some(&self.layers[0].in_norm), eps, mode, 1.0)?;
-            In::Q(q, s)
-        } else {
-            In::T(kernels::add_norm(&x, None, Some(&self.layers[0].in_norm), eps, mode, 1.0)?.1)
-        };
+        let (x, h) = prof::time(0, &self.dev, || {
+            let mut x = self.embed.rows_at(ids, self.dt)?;
+            if let Some(s) = self.embed_scale {
+                x = (x * s)?;
+            }
+            let h = if self.q8_in(mixer_in(&self.layers[0].mixer)) {
+                let (_, q, s) =
+                    kernels::add_norm_q8(&x, None, Some(&self.layers[0].in_norm), eps, mode, 1.0)?;
+                In::Q(q, s)
+            } else {
+                In::T(kernels::add_norm(&x, None, Some(&self.layers[0].in_norm), eps, mode, 1.0)?.1)
+            };
+            Ok((x, h))
+        })?;
+        let (mut x, mut h) = (x, h);
         let picks_t = Tensor::new(picks, &self.dev)?;
         let nl = self.layers.len();
         for (i, l) in self.layers.iter().enumerate() {
@@ -1201,30 +1205,34 @@ impl Model {
                 (core, x)
             };
             let mut mixed = match &l.mixer {
-                Mixer::Gdn(g) => proj(&g.out, &l.lora[1], &core)?,
-                Mixer::Attn(a) => proj(&a.o, &l.lora[1], &core)?,
+                Mixer::Gdn(g) => proj_timed(&g.out, &l.lora[1], &core, Some((7, &self.dev)))?,
+                Mixer::Attn(a) => proj_timed(&a.o, &l.lora[1], &core, Some((7, &self.dev)))?,
             };
             if let Some(w) = &l.post_mix {
                 mixed = kernels::add_norm(&mixed, None, Some(w), eps, mode, 1.0)?.1;
             }
-            let (xn, hn) = if self.q8_in(&l.gate_up) {
-                let (xn, q, s) =
-                    kernels::add_norm_q8(&xr, Some(&mixed), Some(&l.pre_mlp), eps, mode, 1.0)?;
-                (xn, In::Q(q, s))
-            } else {
-                let (xn, hn) =
-                    kernels::add_norm(&xr, Some(&mixed), Some(&l.pre_mlp), eps, mode, 1.0)?;
-                (xn, In::T(hn))
-            };
-            let gu = proj(&l.gate_up, &l.lora[2], &hn)?;
-            let act = if self.q8_in(&l.down) {
-                let (q, s) = kernels::act_mul_q8(&gu, self.act, self.round_act)?;
-                In::Q(q, s)
-            } else {
-                In::T(kernels::act_mul(&gu, self.act, self.round_act)?)
-            };
+            let (xn, hn) = prof::time(8, &self.dev, || {
+                Ok(if self.q8_in(&l.gate_up) {
+                    let (xn, q, s) =
+                        kernels::add_norm_q8(&xr, Some(&mixed), Some(&l.pre_mlp), eps, mode, 1.0)?;
+                    (xn, In::Q(q, s))
+                } else {
+                    let (xn, hn) =
+                        kernels::add_norm(&xr, Some(&mixed), Some(&l.pre_mlp), eps, mode, 1.0)?;
+                    (xn, In::T(hn))
+                })
+            })?;
+            let gu = proj_timed(&l.gate_up, &l.lora[2], &hn, Some((9, &self.dev)))?;
+            let act = prof::time(10, &self.dev, || {
+                Ok(if self.q8_in(&l.down) {
+                    let (q, s) = kernels::act_mul_q8(&gu, self.act, self.round_act)?;
+                    In::Q(q, s)
+                } else {
+                    In::T(kernels::act_mul(&gu, self.act, self.round_act)?)
+                })
+            })?;
             drop(gu);
-            let mut m = proj(&l.down, &l.lora[3], &act)?;
+            let mut m = proj_timed(&l.down, &l.lora[3], &act, Some((11, &self.dev)))?;
             if let Some(w) = &l.post_mlp {
                 m = kernels::add_norm(&m, None, Some(w), eps, mode, 1.0)?.1;
             }
@@ -1234,17 +1242,23 @@ impl Model {
                 &self.layers[i + 1].in_norm
             };
             if last {
-                let (_, hn2) = kernels::add_norm(&xn, Some(&m), Some(next), eps, mode, l.scalar)?;
-                return hn2.to_dtype(DType::F32);
+                let out = prof::time(13, &self.dev, || {
+                    let (_, hn2) = kernels::add_norm(&xn, Some(&m), Some(next), eps, mode, l.scalar)?;
+                    hn2.to_dtype(DType::F32)
+                });
+                prof::pass_done();
+                return out;
             }
-            let (xn2, hn2) = if self.q8_in(mixer_in(&self.layers[i + 1].mixer)) {
-                let (xn2, q, s) =
-                    kernels::add_norm_q8(&xn, Some(&m), Some(next), eps, mode, l.scalar)?;
-                (xn2, In::Q(q, s))
-            } else {
-                let (xn2, hn2) = kernels::add_norm(&xn, Some(&m), Some(next), eps, mode, l.scalar)?;
-                (xn2, In::T(hn2))
-            };
+            let (xn2, hn2) = prof::time(8, &self.dev, || {
+                Ok(if self.q8_in(mixer_in(&self.layers[i + 1].mixer)) {
+                    let (xn2, q, s) =
+                        kernels::add_norm_q8(&xn, Some(&m), Some(next), eps, mode, l.scalar)?;
+                    (xn2, In::Q(q, s))
+                } else {
+                    let (xn2, hn2) = kernels::add_norm(&xn, Some(&m), Some(next), eps, mode, l.scalar)?;
+                    (xn2, In::T(hn2))
+                })
+            })?;
             x = xn2;
             h = hn2;
         }
@@ -1262,37 +1276,95 @@ impl Model {
     ) -> Result<Option<In>> {
         Ok(match &l.mixer {
             Mixer::Gdn(g) => {
-                let p = proj(&g.proj, &l.lora[0], h)?;
-                let o =
-                    kernels::conv_gdn(&p, &g.conv_w, &g.a_neg, &g.dt_bias, pack, &g.spec, g.lg)?;
+                let p = proj_timed(&g.proj, &l.lora[0], h, Some((1, &self.dev)))?;
+                let o = prof::time(2, &self.dev, || {
+                    kernels::conv_gdn(&p, &g.conv_w, &g.a_neg, &g.dt_bias, pack, &g.spec, g.lg)
+                })?;
                 if cache_only {
                     return Ok(None);
                 }
-                if q8_out && self.q8_in(&g.out) {
-                    let (q, s) = kernels::gated_norm_q8(&o, &p, &g.norm_w, &g.spec)?;
-                    Some(In::Q(q, s))
-                } else {
-                    Some(In::T(kernels::gated_norm(&o, &p, &g.norm_w, &g.spec)?))
-                }
+                prof::time(3, &self.dev, || {
+                    Ok(if q8_out && self.q8_in(&g.out) {
+                        let (q, s) = kernels::gated_norm_q8(&o, &p, &g.norm_w, &g.spec)?;
+                        Some(In::Q(q, s))
+                    } else {
+                        Some(In::T(kernels::gated_norm(&o, &p, &g.norm_w, &g.spec)?))
+                    })
+                })?
             }
             Mixer::Attn(a) => {
-                let p = proj(&a.qkv, &l.lora[0], h)?;
-                let (q, k, v) = kernels::qkv_prep(&p, pack, &a.spec)?;
+                let p = proj_timed(&a.qkv, &l.lora[0], h, Some((4, &self.dev)))?;
+                let (q, k, v) = prof::time(5, &self.dev, || kernels::qkv_prep(&p, pack, &a.spec))?;
                 if cache_only {
                     return Ok(None);
                 }
-                Some(In::T(kernels::attention(&q, &k, &v, &p, pack, &a.spec)?))
+                Some(In::T(prof::time(6, &self.dev, || kernels::attention(&q, &k, &v, &p, pack, &a.spec))?))
             }
         })
     }
 }
 
-/// A projection plus its unmerged LoRA, if any.
-fn proj(p: &Proj, lora: &Option<Lora>, x: &In) -> Result<Tensor> {
-    let y = p.forward_in(x)?;
-    match lora {
-        None => Ok(y),
-        Some(l) => l.add_to(y, x),
+/// KEV_PROF=1: wall time of each block of the forward pass between device syncs (so blocks do not overlap and each
+/// one's GPU time is exact; total throughput drops while it is on). Totals print to stderr every 50 passes.
+pub mod prof {
+    use candle_core::{Device, Result};
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
+    use std::sync::OnceLock;
+    use std::time::Instant;
+
+    pub const NAMES: [&str; 14] = ["embed+norm", "gdn in-proj", "gdn conv+delta", "gdn gated-norm", "attn qkv-proj",
+        "attn qkv-prep", "attn core", "out-proj", "add+norm", "mlp gate_up", "mlp act", "mlp down", "lora delta",
+        "final"];
+    static NS: [AtomicU64; 14] = [const { AtomicU64::new(0) }; 14];
+    static CALLS: [AtomicU64; 14] = [const { AtomicU64::new(0) }; 14];
+    static PASSES: AtomicU64 = AtomicU64::new(0);
+    static ON: OnceLock<bool> = OnceLock::new();
+    static PRINTING: AtomicBool = AtomicBool::new(false);
+
+    pub fn on() -> bool {
+        *ON.get_or_init(|| std::env::var("KEV_PROF").is_ok_and(|v| v == "1"))
+    }
+
+    /// Run `f` as block `i`, timed between syncs when profiling.
+    pub fn time<T>(i: usize, dev: &Device, f: impl FnOnce() -> Result<T>) -> Result<T> {
+        if !on() {
+            return f();
+        }
+        dev.synchronize()?;
+        let t = Instant::now();
+        let r = f()?;
+        dev.synchronize()?;
+        NS[i].fetch_add(t.elapsed().as_nanos() as u64, Relaxed);
+        CALLS[i].fetch_add(1, Relaxed);
+        Ok(r)
+    }
+
+    pub fn pass_done() {
+        if !on() || (PASSES.fetch_add(1, Relaxed) + 1) % 50 != 0 || PRINTING.swap(true, Relaxed) {
+            return;
+        }
+        let tot: u64 = NS.iter().map(|n| n.load(Relaxed)).sum::<u64>().max(1);
+        let mut rows: Vec<(usize, u64)> = (0..NAMES.len()).map(|i| (i, NS[i].load(Relaxed))).collect();
+        rows.sort_by_key(|r| std::cmp::Reverse(r.1));
+        eprintln!("kev prof after {} passes ({:.2} s in blocks):", PASSES.load(Relaxed), tot as f64 / 1e9);
+        for (i, ns) in rows {
+            let c = CALLS[i].load(Relaxed).max(1);
+            eprintln!("  {:>5.1}%  {:<16} {:>9.1} us/call  x{}", 100.0 * ns as f64 / tot as f64, NAMES[i], ns as f64 / c as f64 / 1e3, c);
+        }
+        PRINTING.store(false, Relaxed);
+    }
+}
+
+/// A projection plus its unmerged LoRA, with the base counted as profiler block `base` and the LoRA delta as its own.
+fn proj_timed(p: &Proj, lora: &Option<Lora>, x: &In, base: Option<(usize, &Device)>) -> Result<Tensor> {
+    let y = match base {
+        Some((i, dev)) => prof::time(i, dev, || p.forward_in(x))?,
+        None => p.forward_in(x)?,
+    };
+    match (lora, base) {
+        (None, _) => Ok(y),
+        (Some(l), Some((_, dev))) => prof::time(12, dev, || l.add_to(y, x)),
+        (Some(l), None) => l.add_to(y, x),
     }
 }
 
