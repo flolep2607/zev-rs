@@ -24,7 +24,10 @@ pub const SPECIAL: [&str; 5] = [
     "<|fim_suffix|>",
 ];
 pub const SERVE_MAX_STATE: usize = 8192;
-pub const SERVE_MAX_BRANCH: usize = 8192;
+/// A question row (state + its branch) may hold this many tokens: the state plus up to 8,192 of question and options, as
+/// kev.model.SERVE_MAX_BRANCH (= SERVE_MAX_STATE + 8192). A flat 8,192 refused big pages whose option list did not fit
+/// beside a ~7k-token state (HTTP 422 "branch too long") where kev.serve answers.
+pub const SERVE_MAX_BRANCH: usize = SERVE_MAX_STATE + 8192;
 pub const MAX_OPTIONS: usize = 255;
 
 /// Python `str()` of a JSON scalar as pydantic parses it (int, float, bool, str).
@@ -319,5 +322,37 @@ mod tests {
         assert_eq!(py_float(0.1), "0.1");
         assert_eq!(py_float(2.5e16), "2.5e+16");
         assert_eq!(option_text("k", Some(&Value::String(String::new()))), "k");
+    }
+
+    fn word_encoder() -> Encoder {
+        use tokenizers::models::wordlevel::WordLevel;
+        use tokenizers::pre_tokenizers::whitespace::Whitespace;
+        let vocab = SPECIAL.iter().map(|s| s.to_string()).chain(["x".to_string()])
+            .enumerate().map(|(i, s)| (s, i as u32)).collect();
+        let mut tok = Tokenizer::new(WordLevel::builder().vocab(vocab).unk_token("x".into()).build().unwrap());
+        tok.with_pre_tokenizer(Some(Whitespace {}));
+        Encoder::new(tok).unwrap()
+    }
+
+    fn words(n: usize) -> String {
+        vec!["x"; n].join(" ")
+    }
+
+    fn question(options: Vec<String>) -> Question {
+        Question { id: "action".into(), kind: "choice".into(), instr: words(10), keys: (0..options.len()).map(|i| format!("c{i}")).collect(),
+                   options, legend: None }
+    }
+
+    #[test]
+    fn big_page_keeps_its_options() {
+        let enc = word_encoder();
+        // a ~7k-token page with a 1.4k-token option list: refused under the old flat 8,192-token row
+        let q = question((0..14).map(|_| words(100)).collect());
+        let (s, rows) = enc.encode(&words(7000), &[q]).unwrap();
+        assert_eq!(s.len(), 7001);
+        assert_eq!(rows[0].ids.len(), 1 + 10 + 14 * 102 + 1);
+        // a row is capped at SERVE_MAX_BRANCH (state cap + 8,192), as in kev, not unlimited
+        let q = question(vec![words(SERVE_MAX_BRANCH)]);
+        assert!(enc.encode(&words(100), &[q]).err().unwrap().contains("branch too long"));
     }
 }
