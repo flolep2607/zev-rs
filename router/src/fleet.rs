@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use serde::Deserialize;
-use tokio::sync::Notify;
+use tokio::sync::{watch, Notify};
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct Upstream {
@@ -18,20 +18,48 @@ pub struct Upstream {
     /// Headless Service name: DNS gives one A record per ready pod.
     #[serde(default)]
     pub dns: Option<String>,
-    /// Fixed "ip:port" backends (rented boxes, NodePorts for a smoke test).
+    /// Fixed "ip:port" backends.
     #[serde(default)]
     pub addrs: Vec<String>,
+    #[serde(default)]
     pub port: u16,
     /// Routing weight: a 4090 is 10. No default, as in florian-nginx: a guessed weight wrecks the split.
     pub gpu_multiplier: f64,
-    /// Admission cap per card for the whole fleet of routers; each replica takes its share.
+    /// Admission cap per card for the whole set of routers; each replica takes its share.
     pub max_inflight: usize,
+    /// Started with --language-model-only: an image request 400s there, and 4xx is not retried.
     #[serde(default)]
     pub text_only: bool,
+    /// Inflates a `Content-Encoding: deflate` request body (vLLM with inflate_mw). Rented boxes are metered per GB.
+    #[serde(default)]
+    pub deflate: bool,
+    /// Rented boxes run vLLM with --api-key; sent to them only, never to an in-cluster pod.
+    #[serde(skip)]
+    pub api_key: Option<String>,
 }
 
 fn default_pool() -> String {
     "default".into()
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct CaptureCfg {
+    /// POST target for the replay events, e.g. http://172.17.16.214:9009/events.
+    pub endpoint: String,
+    /// Probed with HEAD every check_interval_s; empty = the endpoint itself. Any HTTP status means up.
+    #[serde(default)]
+    pub health_path: String,
+    #[serde(default = "thirty")]
+    pub check_interval_s: u64,
+    #[serde(default = "mib25")]
+    pub max_request_bytes: usize,
+    #[serde(default = "mib2")]
+    pub max_response_bytes: usize,
+    /// Events awaiting delivery; past this they are dropped, so a slow receiver cannot eat the router's memory.
+    #[serde(default = "two")]
+    pub max_pending: usize,
+    #[serde(default = "ms500")]
+    pub timeout_ms: u64,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -41,8 +69,16 @@ pub struct Config {
     /// losing a replica under-admits, the safe direction. ponytail: no shared state; Redis if this passes ~3.
     #[serde(default = "one")]
     pub replicas: usize,
+    /// Proxy worker threads. One process, so one shared state across all of them.
+    #[serde(default = "four")]
+    pub threads: usize,
+    /// Exact request path -> pool. Anything unlisted is "default".
     #[serde(default)]
     pub pool_paths: HashMap<String, String>,
+    /// The body's `model` -> pool, applied after pool_paths: kev-combo answers every model name with its own adapter,
+    /// so its models need a pool of their own on the same /v1/systemone path.
+    #[serde(default)]
+    pub pool_models: HashMap<String, String>,
     pub upstreams: Vec<Upstream>,
     #[serde(default = "five")]
     pub metrics_interval_s: u64,
@@ -52,26 +88,87 @@ pub struct Config {
     pub queue_timeout_s: u64,
     #[serde(default = "session_header")]
     pub affinity_header: String,
-    /// Proxy worker threads. One process, so one shared state across all of them.
-    #[serde(default = "four")]
-    pub threads: usize,
-}
-
-fn four() -> usize {
-    4
+    /// How long a session waits for its full home pod (its prefix cache) before taking any free slot.
+    #[serde(default = "twenty")]
+    pub affinity_wait_s: u64,
+    /// ...cut short once another pod scores this many times the home; 0 = always wait the full affinity_wait_s.
+    #[serde(default = "three")]
+    pub spill_ratio: f64,
+    /// Default stop length of /drain. A TTL: a drain nobody lifts expires.
+    #[serde(default = "three_hundred")]
+    pub drain_seconds: u64,
+    /// Headless Service of the router replicas, so /drain reaches every one, not the one the Service picked.
+    #[serde(default)]
+    pub peers_dns: Option<String>,
+    #[serde(default = "port8000")]
+    pub peers_port: u16,
+    #[serde(default)]
+    pub capture: Option<CaptureCfg>,
+    /// Rented GPUs (vast-holo.py's Secret), re-read every scrape: renting a box never restarts the router.
+    #[serde(default)]
+    pub external_file: Option<String>,
+    #[serde(default = "forty")]
+    pub external_max_inflight: usize,
+    /// Deflate request bodies at least this big for pods that inflate them; 0 = never.
+    #[serde(default = "kib4")]
+    pub compress_min: usize,
+    /// Level 1: 2.7x for 0.5 ms on these prompts, against 3.2x for 6 ms at level 6.
+    #[serde(default = "one32")]
+    pub compress_level: u32,
+    #[serde(default = "mib100")]
+    pub max_body_bytes: usize,
 }
 
 fn one() -> usize {
     1
 }
+fn two() -> usize {
+    2
+}
+fn four() -> usize {
+    4
+}
+fn forty() -> usize {
+    40
+}
 fn five() -> u64 {
     5
+}
+fn twenty() -> u64 {
+    20
 }
 fn thirty() -> u64 {
     30
 }
 fn one_eighty() -> u64 {
     180
+}
+fn three_hundred() -> u64 {
+    300
+}
+fn three() -> f64 {
+    3.0
+}
+fn one32() -> u32 {
+    1
+}
+fn port8000() -> u16 {
+    8000
+}
+fn ms500() -> u64 {
+    500
+}
+fn kib4() -> usize {
+    4096
+}
+fn mib2() -> usize {
+    2 << 20
+}
+fn mib25() -> usize {
+    25 << 20
+}
+fn mib100() -> usize {
+    100 << 20
 }
 fn session_header() -> String {
     "x-session-id".into()
@@ -115,6 +212,56 @@ pub fn parse_metrics(body: &str) -> Sample {
         s.iterations = zev_passes;
     }
     s
+}
+
+/// Rented boxes from the mounted Secret. An entry without ip, port or gpu_multiplier is refused, not defaulted:
+/// the weight decides the traffic split. A missing or malformed file means nothing rented.
+pub fn external_upstreams(json: &str, default_cap: usize) -> Vec<Upstream> {
+    #[derive(Deserialize)]
+    struct Entry {
+        name: Option<String>,
+        ip: Option<String>,
+        port: Option<u16>,
+        gpu_multiplier: Option<f64>,
+        max_inflight: Option<usize>,
+        #[serde(default)]
+        deflate: bool,
+        #[serde(default)]
+        text_only: bool,
+    }
+    #[derive(Deserialize)]
+    struct Doc {
+        api_key: Option<String>,
+        #[serde(default)]
+        endpoints: Vec<serde_json::Value>,
+    }
+    let Ok(doc) = serde_json::from_str::<Doc>(json) else {
+        log::error!("external endpoints file is not valid JSON, ignoring");
+        return vec![];
+    };
+    let key = doc.api_key.filter(|k| !k.is_empty());
+    doc.endpoints
+        .into_iter()
+        .filter_map(|v| {
+            let e: Entry = serde_json::from_value(v.clone()).ok()?;
+            let (Some(ip), Some(port), Some(mult)) = (e.ip, e.port, e.gpu_multiplier) else {
+                log::error!("external endpoint ignored, needs ip, port and gpu_multiplier: {v}");
+                return None;
+            };
+            Some(Upstream {
+                name: e.name.unwrap_or_else(|| format!("external-{ip}")),
+                pool: default_pool(), // rented boxes are vLLM
+                dns: None,
+                addrs: vec![format!("{ip}:{port}")],
+                port,
+                gpu_multiplier: mult,
+                max_inflight: e.max_inflight.unwrap_or(default_cap),
+                text_only: e.text_only,
+                deflate: e.deflate,
+                api_key: key.clone(),
+            })
+        })
+        .collect()
 }
 
 #[derive(Debug)]
@@ -214,6 +361,11 @@ pub struct Fleet {
     pub freed: Notify,
     /// Responses by (pool, status class), for /metrics.
     responses: Mutex<HashMap<(String, &'static str), u64>>,
+    /// /drain: admission closed until then.
+    drained_until: Mutex<Option<Instant>>,
+    /// Bumped by /drain: every in-flight request watching it drops its upstream connection, which aborts the
+    /// generation. nginx needed a reload for that; here it is a channel.
+    pub cut: watch::Sender<u64>,
 }
 
 impl Fleet {
@@ -223,7 +375,52 @@ impl Fleet {
             pods: RwLock::new(Vec::new()),
             freed: Notify::new(),
             responses: Mutex::new(HashMap::new()),
+            drained_until: Mutex::new(None),
+            cut: watch::channel(0).0,
         }
+    }
+
+    pub fn stall(&self) -> Duration {
+        Duration::from_secs(self.cfg.stall_s)
+    }
+
+    pub fn pool_for(&self, path: &str) -> &str {
+        self.cfg
+            .pool_paths
+            .get(path)
+            .map_or("default", String::as_str)
+    }
+
+    /// Only a pool with a text-only member needs its bodies scanned for images.
+    pub fn has_text_only(&self, pool: &str) -> bool {
+        self.pods
+            .read()
+            .unwrap()
+            .iter()
+            .any(|p| p.up.pool == pool && p.up.text_only)
+    }
+
+    pub fn drained(&self) -> bool {
+        self.drained_until
+            .lock()
+            .unwrap()
+            .is_some_and(|t| Instant::now() < t)
+    }
+
+    /// Close admission for `seconds` (0 = reopen) and cut everything in flight.
+    pub fn drain(&self, seconds: u64) {
+        *self.drained_until.lock().unwrap() =
+            (seconds > 0).then(|| Instant::now() + Duration::from_secs(seconds));
+        if seconds > 0 {
+            self.cut.send_modify(|n| *n += 1);
+        }
+        self.freed.notify_waiters(); // queued requests re-check and give up
+    }
+
+    pub fn drain_remaining_s(&self) -> f64 {
+        self.drained_until.lock().unwrap().map_or(0.0, |t| {
+            t.saturating_duration_since(Instant::now()).as_secs_f64()
+        })
     }
 
     pub fn count(&self, pool: &str, code: u16) {
@@ -242,6 +439,190 @@ impl Fleet {
             .or_default() += 1;
     }
 
+    fn eligible(p: &Pod, pool: &str, needs_image: bool) -> bool {
+        p.up.pool == pool && !(needs_image && p.up.text_only)
+    }
+
+    /// Weighted-random pick among the pool's pods with a free slot, taking the slot. `known` counts the pool's pods
+    /// at all, so the caller can tell "all full" (wait) from "none discovered" (fail now).
+    pub fn reserve(
+        &self,
+        pool: &str,
+        tried: &HashSet<SocketAddr>,
+        needs_image: bool,
+    ) -> (Option<Arc<Pod>>, usize) {
+        let now = Instant::now();
+        let stall = self.stall();
+        let pods = self.pods.read().unwrap();
+        let mut known = 0;
+        let mut cands: Vec<(f64, &Arc<Pod>)> = Vec::new();
+        for p in pods.iter().filter(|p| Self::eligible(p, pool, needs_image)) {
+            known += 1;
+            if tried.contains(&p.addr) {
+                continue;
+            }
+            let st = p.state.lock().unwrap();
+            let score = p.score(&st, now, stall);
+            if score > 0.0 && st.held < p.cap {
+                cands.push((score, p));
+            }
+        }
+        while !cands.is_empty() {
+            let total: f64 = cands.iter().map(|c| c.0).sum();
+            let mut r = rand::random::<f64>() * total;
+            let i = cands.iter().position(|c| {
+                r -= c.0;
+                r <= 0.0
+            });
+            let (_, p) = cands.swap_remove(i.unwrap_or(cands.len() - 1));
+            if self.take(p) {
+                return (Some(p.clone()), known);
+            }
+        }
+        (None, known)
+    }
+
+    /// Weighted rendezvous hash: every replica agrees on a session's home with no shared state, and losing a pod
+    /// rehomes only its own sessions. Failing or stalled pods are skipped.
+    pub fn home(&self, pool: &str, session: &str, needs_image: bool) -> Option<Arc<Pod>> {
+        let now = Instant::now();
+        let stall = self.stall();
+        let pods = self.pods.read().unwrap();
+        pods.iter()
+            .filter(|p| Self::eligible(p, pool, needs_image))
+            .filter(|p| {
+                let st = p.state.lock().unwrap();
+                st.last_seen.is_some()
+                    && !Pod::stalled(&st, now, stall)
+                    && !st.failing_until.is_some_and(|t| now < t)
+            })
+            .map(|p| {
+                let u = (fnv(&format!("{session}|{}", p.addr)) as f64 / u64::MAX as f64).max(1e-12);
+                (p.up.gpu_multiplier / -u.ln(), p)
+            })
+            .max_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(_, p)| p.clone())
+    }
+
+    /// Stop waiting for a full home now? Yes once another pod with a free slot scores `ratio` times the home:
+    /// rendezvous hashing balances session count, not weight, and a few heavy sessions pinned pods at cap while a
+    /// third of the slots sat idle (florian-nginx, 2026-08-11).
+    pub fn crowded(&self, home: &Pod, pool: &str, needs_image: bool) -> bool {
+        let ratio = self.cfg.spill_ratio;
+        if ratio <= 0.0 {
+            return false;
+        }
+        let now = Instant::now();
+        let stall = self.stall();
+        let home_score = home.score(&home.state.lock().unwrap(), now, stall);
+        if home_score <= 0.0 {
+            return true;
+        }
+        self.pods
+            .read()
+            .unwrap()
+            .iter()
+            .filter(|p| p.addr != home.addr && Self::eligible(p, pool, needs_image))
+            .any(|p| {
+                let st = p.state.lock().unwrap();
+                st.held < p.cap && p.score(&st, now, stall) >= ratio * home_score
+            })
+    }
+
+    pub fn take(&self, p: &Arc<Pod>) -> bool {
+        let mut st = p.state.lock().unwrap();
+        if st.held < p.cap {
+            st.held += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn release(&self, p: &Pod) {
+        let mut st = p.state.lock().unwrap();
+        st.held = st.held.saturating_sub(1);
+        drop(st);
+        self.freed.notify_waiters();
+    }
+
+    /// Resolve every upstream, keep the Pod (and its held count) for addresses still present, drop the rest. A
+    /// request in flight on a dropped pod holds its own Arc and releases into it: nothing leaks, nothing to reclaim.
+    pub async fn discover(&self) {
+        let mut ups: Vec<Upstream> = self.cfg.upstreams.clone();
+        if let Some(path) = &self.cfg.external_file {
+            // Absent = nothing rented, the normal state.
+            if let Ok(json) = std::fs::read_to_string(path) {
+                ups.extend(external_upstreams(&json, self.cfg.external_max_inflight));
+            }
+        }
+        let mut found: Vec<(SocketAddr, Arc<Upstream>)> = Vec::new();
+        for up in ups {
+            let up = Arc::new(up);
+            if let Some(dns) = &up.dns {
+                match tokio::net::lookup_host((dns.as_str(), up.port)).await {
+                    Ok(addrs) => found.extend(addrs.map(|a| (a, up.clone()))),
+                    Err(e) => log::warn!("resolve {dns}: {e}"),
+                }
+            }
+            for a in &up.addrs {
+                match a.parse() {
+                    Ok(a) => found.push((a, up.clone())),
+                    Err(e) => log::error!("upstream {}: bad addr {a}: {e}", up.name),
+                }
+            }
+        }
+        let mut pods = self.pods.write().unwrap();
+        let old: HashMap<SocketAddr, Arc<Pod>> = pods.drain(..).map(|p| (p.addr, p)).collect();
+        *pods = found
+            .into_iter()
+            .map(|(a, up)| match old.get(&a) {
+                Some(p) if p.up.name == up.name && p.up.api_key == up.api_key => p.clone(),
+                _ => Arc::new(Pod::new(a, up, self.cfg.replicas)),
+            })
+            .collect();
+    }
+
+    /// One scrape of every pod's /metrics. A failed scrape marks the pod failing and keeps its last sample: zeros
+    /// would score a hung pod as idle, the most attractive backend there is.
+    pub async fn scrape(&self, http: &reqwest::Client) {
+        let pods: Vec<Arc<Pod>> = self.pods.read().unwrap().clone();
+        let stall = self.stall();
+        let mut set = tokio::task::JoinSet::new();
+        for p in pods {
+            let http = http.clone();
+            set.spawn(async move {
+                let mut req = http.get(format!("http://{}/metrics", p.addr));
+                if let Some(key) = &p.up.api_key {
+                    req = req.bearer_auth(key);
+                }
+                let body = match req.send().await {
+                    Ok(r) if r.status().is_success() => r.text().await.ok(),
+                    _ => None,
+                };
+                match body {
+                    Some(b) => {
+                        p.record(parse_metrics(&b), Instant::now());
+                        let st = p.state.lock().unwrap();
+                        if st.stalled_since.is_some_and(|t| t.elapsed() >= stall) {
+                            log::error!(
+                                "stalled engine on {} ({}): step counter frozen with work queued",
+                                p.addr,
+                                p.up.name
+                            );
+                        }
+                    }
+                    None => {
+                        log::warn!("metrics fetch failed for {} ({})", p.addr, p.up.name);
+                        p.fail();
+                    }
+                }
+            });
+        }
+        while set.join_next().await.is_some() {}
+        self.freed.notify_waiters();
+    }
+
     pub fn status_json(&self) -> String {
         let now = Instant::now();
         let stall = self.stall();
@@ -258,11 +639,12 @@ impl Fleet {
                     "running": st.sample.running, "waiting": st.sample.waiting, "kv_cache": st.sample.kv_cache,
                     "iterations": st.sample.iterations, "stalled": Pod::stalled(&st, now, stall),
                     "failing": st.failing_until.is_some_and(|t| now < t),
+                    "text_only": p.up.text_only, "deflate": p.up.deflate, "external": p.up.api_key.is_some(),
                     "seconds_since_scrape": st.last_seen.map(|t| now.duration_since(t).as_secs_f64()),
                 })
             })
             .collect();
-        serde_json::json!({ "pods": pods }).to_string()
+        serde_json::json!({ "drained_s": self.drain_remaining_s(), "pods": pods }).to_string()
     }
 
     /// Per-pod gauges labelled by pool and upstream, plus responses by pool and status class.
@@ -317,6 +699,8 @@ impl Fleet {
                 );
             }
         }
+        let _ = writeln!(out, "# HELP zev_router_drained 1 while /drain holds admission closed\n# TYPE zev_router_drained gauge");
+        let _ = writeln!(out, "zev_router_drained {}", self.drained() as u8);
         let _ = writeln!(out, "# HELP zev_router_responses_total responses by pool and status class\n# TYPE zev_router_responses_total counter");
         for ((pool, class), n) in self.responses.lock().unwrap().iter() {
             let _ = writeln!(
@@ -325,167 +709,6 @@ impl Fleet {
             );
         }
         out
-    }
-
-    pub fn stall(&self) -> Duration {
-        Duration::from_secs(self.cfg.stall_s)
-    }
-
-    pub fn pool_for(&self, path: &str) -> &str {
-        self.cfg
-            .pool_paths
-            .get(path)
-            .map_or("default", String::as_str)
-    }
-
-    /// Weighted-random pick among the pool's pods with a free slot, taking the slot. `known` counts the pool's pods
-    /// at all, so the caller can tell "all full" (wait) from "none discovered" (fail now).
-    pub fn reserve(
-        &self,
-        pool: &str,
-        tried: &HashSet<SocketAddr>,
-        needs_image: bool,
-    ) -> (Option<Arc<Pod>>, usize) {
-        let now = Instant::now();
-        let stall = self.stall();
-        let pods = self.pods.read().unwrap();
-        let mut known = 0;
-        let mut cands: Vec<(f64, &Arc<Pod>)> = Vec::new();
-        for p in pods
-            .iter()
-            .filter(|p| p.up.pool == pool && !(needs_image && p.up.text_only))
-        {
-            known += 1;
-            if tried.contains(&p.addr) {
-                continue;
-            }
-            let st = p.state.lock().unwrap();
-            let score = p.score(&st, now, stall);
-            if score > 0.0 && st.held < p.cap {
-                cands.push((score, p));
-            }
-        }
-        while !cands.is_empty() {
-            let total: f64 = cands.iter().map(|c| c.0).sum();
-            let mut r = rand::random::<f64>() * total;
-            let i = cands.iter().position(|c| {
-                r -= c.0;
-                r <= 0.0
-            });
-            let (_, p) = cands.swap_remove(i.unwrap_or(cands.len() - 1));
-            let mut st = p.state.lock().unwrap();
-            if st.held < p.cap {
-                st.held += 1;
-                return (Some(p.clone()), known);
-            }
-        }
-        (None, known)
-    }
-
-    /// Weighted rendezvous hash: every replica agrees on a session's home with no shared state, and losing a pod
-    /// rehomes only its own sessions. Failing or stalled pods are skipped.
-    pub fn home(&self, pool: &str, session: &str, needs_image: bool) -> Option<Arc<Pod>> {
-        let now = Instant::now();
-        let stall = self.stall();
-        let pods = self.pods.read().unwrap();
-        pods.iter()
-            .filter(|p| p.up.pool == pool && !(needs_image && p.up.text_only))
-            .filter(|p| {
-                let st = p.state.lock().unwrap();
-                st.last_seen.is_some()
-                    && !Pod::stalled(&st, now, stall)
-                    && !st.failing_until.is_some_and(|t| now < t)
-            })
-            .map(|p| {
-                let u = (fnv(&format!("{session}|{}", p.addr)) as f64 / u64::MAX as f64).max(1e-12);
-                (p.up.gpu_multiplier / -u.ln(), p)
-            })
-            .max_by(|a, b| a.0.total_cmp(&b.0))
-            .map(|(_, p)| p.clone())
-    }
-
-    pub fn take(&self, p: &Arc<Pod>) -> bool {
-        let mut st = p.state.lock().unwrap();
-        if st.held < p.cap {
-            st.held += 1;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn release(&self, p: &Pod) {
-        let mut st = p.state.lock().unwrap();
-        st.held = st.held.saturating_sub(1);
-        drop(st);
-        self.freed.notify_waiters();
-    }
-
-    /// Resolve every upstream, keep the Pod (and its held count) for addresses still present, drop the rest. A
-    /// request in flight on a dropped pod holds its own Arc and releases into it: nothing leaks, nothing to reclaim.
-    pub async fn discover(&self) {
-        let mut found: Vec<(SocketAddr, Arc<Upstream>)> = Vec::new();
-        for up in &self.cfg.upstreams {
-            let up = Arc::new(up.clone());
-            if let Some(dns) = &up.dns {
-                match tokio::net::lookup_host((dns.as_str(), up.port)).await {
-                    Ok(addrs) => found.extend(addrs.map(|a| (a, up.clone()))),
-                    Err(e) => log::warn!("resolve {dns}: {e}"),
-                }
-            }
-            for a in &up.addrs {
-                match a.parse() {
-                    Ok(a) => found.push((a, up.clone())),
-                    Err(e) => log::error!("upstream {}: bad addr {a}: {e}", up.name),
-                }
-            }
-        }
-        let mut pods = self.pods.write().unwrap();
-        let old: HashMap<SocketAddr, Arc<Pod>> = pods.drain(..).map(|p| (p.addr, p)).collect();
-        *pods = found
-            .into_iter()
-            .map(|(a, up)| match old.get(&a) {
-                Some(p) if p.up.name == up.name => p.clone(),
-                _ => Arc::new(Pod::new(a, up, self.cfg.replicas)),
-            })
-            .collect();
-    }
-
-    /// One scrape of every pod's /metrics. A failed scrape marks the pod failing and keeps its last sample: zeros
-    /// would score a hung pod as idle, the most attractive backend there is.
-    pub async fn scrape(&self, http: &reqwest::Client) {
-        let pods: Vec<Arc<Pod>> = self.pods.read().unwrap().clone();
-        let stall = self.stall();
-        let mut set = tokio::task::JoinSet::new();
-        for p in pods {
-            let http = http.clone();
-            set.spawn(async move {
-                let url = format!("http://{}/metrics", p.addr);
-                let body = match http.get(&url).send().await {
-                    Ok(r) if r.status().is_success() => r.text().await.ok(),
-                    _ => None,
-                };
-                match body {
-                    Some(b) => {
-                        p.record(parse_metrics(&b), Instant::now());
-                        let st = p.state.lock().unwrap();
-                        if st.stalled_since.is_some_and(|t| t.elapsed() >= stall) {
-                            log::error!(
-                                "stalled engine on {} ({}): step counter frozen with work queued",
-                                p.addr,
-                                p.up.name
-                            );
-                        }
-                    }
-                    None => {
-                        log::warn!("metrics fetch failed for {} ({})", p.addr, p.up.name);
-                        p.fail();
-                    }
-                }
-            });
-        }
-        while set.join_next().await.is_some() {}
-        self.freed.notify_waiters();
     }
 }
 
@@ -509,6 +732,8 @@ mod tests {
             gpu_multiplier: mult,
             max_inflight: cap,
             text_only: false,
+            deflate: false,
+            api_key: None,
         })
     }
 
@@ -663,28 +888,107 @@ mod tests {
     }
 
     #[test]
-    fn home_is_stable_and_skips_failing() {
+    fn text_only_pods_never_get_images() {
+        let mut text = (*up("text", "default", 10.0, 4)).clone();
+        text.text_only = true;
+        let f = fleet(vec![
+            ("10.0.0.1:8000", up("mm", "default", 10.0, 4), 0.0),
+            ("10.0.0.2:8000", Arc::new(text), 0.0),
+        ]);
+        assert!(f.has_text_only("default") && !f.has_text_only("kev"));
+        for _ in 0..4 {
+            assert_eq!(
+                f.reserve("default", &HashSet::new(), true)
+                    .0
+                    .unwrap()
+                    .up
+                    .name,
+                "mm"
+            );
+        }
+        let (p, known) = f.reserve("default", &HashSet::new(), true);
+        assert!(
+            p.is_none() && known == 1,
+            "text-only pods are not even known to an image request"
+        );
+        for i in 0..20 {
+            assert_eq!(
+                f.home("default", &format!("s{i}"), true).unwrap().up.name,
+                "mm"
+            );
+        }
+    }
+
+    #[test]
+    fn home_is_stable_spills_and_skips_failing() {
         let f = fleet(vec![
             ("10.0.0.1:8000", up("a", "default", 10.0, 8), 0.0),
             ("10.0.0.2:8000", up("a", "default", 10.0, 8), 0.0),
         ]);
-        let h1 = f.home("default", "sess-1", false).unwrap().addr;
+        let h1 = f.home("default", "sess-1", false).unwrap();
         assert_eq!(
             f.home("default", "sess-1", false).unwrap().addr,
-            h1,
+            h1.addr,
             "same session, same pod"
         );
-        f.pods
-            .read()
-            .unwrap()
-            .iter()
-            .find(|p| p.addr == h1)
-            .unwrap()
-            .fail();
+        assert!(
+            !f.crowded(&h1, "default", false),
+            "equal pods: hold the prefix"
+        );
+        h1.record(
+            Sample {
+                running: 40.0,
+                ..Default::default()
+            },
+            Instant::now(),
+        );
+        assert!(
+            f.crowded(&h1, "default", false),
+            "a jammed home spills to a clearly idler sibling"
+        );
+        h1.fail();
         assert_ne!(
             f.home("default", "sess-1", false).unwrap().addr,
-            h1,
+            h1.addr,
             "a failing home rehomes"
+        );
+    }
+
+    #[test]
+    fn external_registry_refuses_weightless_entries() {
+        let json = r#"{"api_key":"s3cret","endpoints":[
+            {"name":"vast-1","ip":"1.2.3.4","port":41234,"gpu_multiplier":12.7,"max_inflight":41,"deflate":true},
+            {"name":"no-weight","ip":"5.6.7.8","port":41235},
+            {"ip":"9.9.9.9","port":8000,"gpu_multiplier":10}]}"#;
+        let ups = external_upstreams(json, 40);
+        assert_eq!(ups.len(), 2, "an entry without gpu_multiplier is refused");
+        assert_eq!(
+            (ups[0].gpu_multiplier, ups[0].max_inflight, ups[0].deflate),
+            (12.7, 41, true)
+        );
+        assert_eq!(
+            ups[1].max_inflight, 40,
+            "cap falls back to external_max_inflight"
+        );
+        assert_eq!(ups[1].api_key.as_deref(), Some("s3cret"));
+        assert!(external_upstreams("{ not json", 40).is_empty());
+    }
+
+    #[test]
+    fn drain_closes_and_reopens() {
+        let f = fleet(vec![]);
+        assert!(!f.drained());
+        let mut cut = f.cut.subscribe();
+        f.drain(60);
+        assert!(
+            f.drained() && cut.has_changed().unwrap(),
+            "drain closes admission and signals in-flight requests"
+        );
+        cut.mark_unchanged();
+        f.drain(0);
+        assert!(
+            !f.drained() && !cut.has_changed().unwrap(),
+            "resume reopens without cutting anything"
         );
     }
 }

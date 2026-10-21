@@ -1,68 +1,111 @@
 # zev-router
 
-One load-aware router for the Kev (zev-fast) and vLLM pools, on [Pingora](https://github.com/cloudflare/pingora).
-A port of learning-helm's `florian-nginx` (OpenResty + Lua): Pingora does the proxying, `src/fleet.rs` decides where
-each request goes.
+One load-aware router for the Kev (zev-fast) and vLLM pools, a port of learning-helm's `florian-nginx`
+(OpenResty + Lua) to Rust on [Pingora](https://github.com/cloudflare/pingora).
 
     cargo build --release
     zev-router router.json
 
-## What it does per request
+Pingora is the server (HTTP/1 and h2 downstream, worker threads, graceful restart). Forwarding is the router's own,
+through a keep-alive reqwest client: the image check, the `model` pool and per-pod compression all need the whole body
+before a pod is chosen, and Pingora's proxy can only replay a body it buffered itself (64 KiB, smaller than a
+screenshot prompt).
 
-1. The path picks a **pool** (`pool_paths`; anything unlisted is `default`). A request, and every retry of it, only
-   ever sees pods of its pool: Kev's `/v1/systemone` never lands on a vLLM chat pod.
-2. With the `affinity_header` (default `x-session-id`) it tries the session's **home** pod first: weighted rendezvous
-   hash, so every router replica agrees with no shared state.
-3. Otherwise a **weighted-random pod with a free slot**, scored `gpu_multiplier / (1 + running + waiting)` from each
-   pod's own `/metrics` (x0.1 over 95% KV cache, x0.5 on a sample older than 15 s, x0.05 for 30 s after a failure).
-4. Every pod full: the request **waits** for a slot to be released (a `Notify`, not a poll), up to `queue_timeout_s`,
-   then 503. No pod in the pool at all: 502 at once.
-5. Connect error, broken upstream, or **429/500/502/503 before the first byte**: the pod is scored down and the
-   request is replayed on an untried pod, 3 attempts in all. Bodies up to 64 KiB are buffered for the replay.
+## Per request
 
-In the background, every `metrics_interval_s`: resolve each upstream (`dns` = a headless Service, or fixed `addrs`),
-scrape `/metrics`. Both dialects are read: vLLM's `num_requests_running/waiting`, `kv_cache_usage_perc`,
-`iteration_tokens_total_count`, and zev's `zev_in_flight` + `zev_passes_total` (summed over a pod's models). A step
-counter frozen for `stall_s` while work is queued is a **wedged engine**: skipped outright, not scored down.
+1. **Drained?** 503 (`/drain` below).
+2. **Read the body**, bounded by `max_body_bytes` (413 past it). Every retry replays it; it is dropped as soon as the
+   response headers arrive, so a long stream does not hold its prompt.
+3. **Pool**: `pool_paths[path]`, else `default`; then `pool_models[body.model]` overrides it. A request and all its
+   retries stay in their pool. kev-combo, which answers every model name with its own adapter, gets its own pool on
+   the same `/v1/systemone` path this way.
+4. **Image check**, only for a pool with a `text_only` pod: a `"type": "image_url"` content part keeps the request off
+   text-only pods (a bare `image_url` in a prompt or schema does not).
+5. **Admission**. With the `affinity_header` (default `x-session-id`), the session's **home** pod (weighted rendezvous
+   hash: every replica agrees, losing a pod rehomes only its sessions) if it has a free slot. A full home is waited for
+   up to `affinity_wait_s`, unless another pod with room scores `spill_ratio` times the home. Otherwise a
+   **weighted-random pod with a free slot**, scored `gpu_multiplier / (1 + running + waiting)` from the pod's own
+   `/metrics` (x0.1 over 95% KV cache, x0.5 on a sample older than 15 s, x0.05 for 30 s after a failure; a stalled pod
+   scores 0). Every pod full: wait for a release (woken by a `Notify`), up to `queue_timeout_s`, then 503. No pod in
+   the pool: 502 at once.
+6. **Attempts**, up to 3: a connect error, no headers within 600 s, or a **429/500/502/503** goes to an untried pod,
+   and the pod is scored down for 30 s. With no untried pod left, the last answer is passed through.
+   Per attempt: a pod with `deflate` gets the body zlib-compressed (`Content-Encoding: deflate`) when it is at least
+   `compress_min`; a rented box gets its `Authorization: Bearer <api_key>`, an in-cluster pod never sees that key.
+7. **Stream back**, cut at once by `/drain` (dropping the upstream connection is what makes vLLM abort the
+   generation). The slot is released after the last byte.
 
-`/ready`, `/balancer-status` (JSON per pod) and `/metrics` (`zev_router_pod_*`, `zev_router_responses_total`) are
-answered by the router itself.
+## In the background, every `metrics_interval_s`
+
+Resolve each upstream (`dns` = a headless Service, `addrs` = fixed backends) and the rented boxes in `external_file`
+(vast-holo.py's Secret, re-read every tick: renting a box never restarts the router; an entry without
+`gpu_multiplier` is refused). Scrape every pod's `/metrics` in both dialects: vLLM's
+`num_requests_running/waiting`, `kv_cache_usage_perc`, `iteration_tokens_total_count`, and zev's `zev_in_flight` +
+`zev_passes_total` (summed over a pod's models). A step counter frozen for `stall_s` while work is queued is a
+**wedged engine**, skipped outright. A failed scrape scores the pod down and keeps its last sample.
+
+## Endpoints of the router itself
+
+- `/ready`
+- `/balancer-status`: JSON per pod (pool, held/cap, score, load, stalled, failing, external, ...) and `drained_s`.
+- `/metrics`: `zev_router_pod_{held,cap,score,load,stalled,failing}`, `zev_router_responses_total{pool,status}`,
+  `zev_router_drained`, `zev_router_capture_dropped_total`.
+- `/drain[?seconds=N]`: close admission for N s (default `drain_seconds`, 0 reopens) and cut every request in flight,
+  on every replica: with `peers_dns` it fans out to each one with `&peer=1`. Refused (403) with an
+  `X-Forwarded-For`, i.e. through an ingress. A TTL: a drain nobody lifts expires.
+
+## Replay capture
+
+With `capture.endpoint`, default-pool requests produce a `request` event when admitted and a `response` event after
+the full response (status, content type, backend, duration, body up to `max_response_bytes`, `truncated`), joined by
+`capture_id`, the same schema as florian-nginx. The receiver is HEAD-checked every `check_interval_s`; while it is down,
+or past `max_pending` events in flight, nothing is captured. Delivery is one shot and never delays inference.
 
 ## Config
 
 ```json
 {
-  "listen": "0.0.0.0:8000",
-  "replicas": 2,
-  "threads": 4,
+  "listen": "0.0.0.0:8000", "replicas": 2, "threads": 4,
   "pool_paths": { "/v1/systemone": "kev" },
+  "pool_models": { "combo-r3-w8b": "kev-combo" },
+  "peers_dns": "argo-workflow-zev-router-peers.argo.svc.cluster.local",
+  "external_file": "/etc/zev-router/external/endpoints.json",
+  "capture": { "endpoint": "http://172.17.16.214:9009/events" },
   "upstreams": [
     { "name": "kev-backfill-4090", "pool": "kev", "port": 8008, "gpu_multiplier": 10, "max_inflight": 64,
       "dns": "argo-workflow-florian-nginx-kev-backfill-4090-pods.argo.svc.cluster.local" },
+    { "name": "florian-agent-4090-fp8", "port": 8000, "gpu_multiplier": 12, "max_inflight": 50, "deflate": true,
+      "dns": "argo-workflow-florian-nginx-florian-agent-4090-fp8-pods.argo.svc.cluster.local" },
     { "name": "florian-agent-5090", "port": 8000, "gpu_multiplier": 17, "max_inflight": 64, "text_only": true,
       "dns": "argo-workflow-florian-nginx-florian-agent-5090-pods.argo.svc.cluster.local" }
   ]
 }
 ```
 
-`max_inflight` is per card for the whole set of routers; each of `replicas` takes its share (rounded up), as in
-florian-nginx. Optional: `metrics_interval_s` (5), `stall_s` (30), `queue_timeout_s` (180), `affinity_header`.
+`max_inflight` is per card for the whole set of routers; each of `replicas` takes its share, rounded up (losing a
+replica under-admits, the safe direction). Defaults: `metrics_interval_s` 5, `stall_s` 30, `queue_timeout_s` 180,
+`affinity_wait_s` 20, `spill_ratio` 3, `drain_seconds` 300, `peers_port` 8000, `external_max_inflight` 40,
+`compress_min` 4096, `compress_level` 1, `max_body_bytes` 100 MiB; capture: `check_interval_s` 30,
+`max_request_bytes` 25 MiB, `max_response_bytes` 2 MiB, `max_pending` 2, `timeout_ms` 500.
 
 ## Against florian-nginx
 
-Better: one process-wide state (no per-worker shared dicts, no JSON decode per pick), queued requests woken on
-release instead of polling every 50 ms, no slot leaks (a pod's slots live in the `Pod` an in-flight request holds,
-so nothing needs reclaiming), retry on 429, typed and unit-tested.
+Same behaviour, plus: one process-wide state (no per-worker shared dicts, no JSON decode per pick); queued requests
+woken on release instead of polling every 50 ms; no slot leaks to reclaim (a pod's slots live in the `Pod` an
+in-flight request holds); 429 retried; compression and the rented-box key decided per attempt, so a retry can go to
+any pod, not only one that inflates; `/drain` cuts in-flight requests itself, no nginx reload; prompts released at
+the first response byte; typed and tested.
 
-Not ported yet: `/drain`, replay capture, request-body deflate for rented boxes, the rented-box Secret
-(`addrs` covers fixed backends), the image scan that keeps image requests off text-only pods (Pingora picks the
-peer before the body is read: needs a body read in `request_filter`), the affinity wait/spill (a full home spills at
-once), and a pool chosen by `model` (kev-combo answers every model name with its own adapter).
+Limits: replicas still keep separate slot counts (shared state, e.g. Redis, past ~3 replicas); each in-flight request
+holds its body until its response headers arrive (bounded by `max_body_bytes`; nginx spilled bodies over 1 MiB to a
+temp file instead); upstreams are plain HTTP/1.1.
 
 ## Checks
 
-    cargo test            # parsing, stall detection, pools, caps, weights, homing
-    python3 smoke.py      # the real binary between a healthy and a wedged fake zev pod: 429s retried, body intact,
-                          # the wedged pod skipped once stalled
+    cargo test        # parsing, stall detection, pools, caps, weights, text-only, homing + spill, the rented-box
+                      # registry, drain, image scan, model, zlib round trip
+    python3 smoke.py  # the real binary against fake pods, a fake capture receiver and a rented-box file: 429 retry
+                      # with a 200 KB body, stall skip, model pool, image routing, rented key + deflate, capture,
+                      # affinity, drain cutting a live stream and reopening
 
-Live, 2026-10-21: 100 real `/v1/systemone` calls through the router to the Kev NodePorts in 1.6 s, all 2xx.
+Live, 2026-10-21: 200 real `/v1/systemone` calls through the router to the Kev NodePorts in 2.8 s, all 2xx.

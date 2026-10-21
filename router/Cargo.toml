@@ -14,7 +14,11 @@ async-trait = "0.1"
 # <1.54: tokio 1.54 asserts a non-zero BufStream capacity, and pingora 0.9 builds every accepted TCP stream with
 # capacity 0, so the proxy thread panics on its first connection. Lift once pingora sizes its buffers.
 tokio = { version = ">=1.40, <1.54", features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
-reqwest = { version = "0.12", default-features = false }
+# json: capture events. No default features: no TLS (cluster-internal and rented boxes are plain HTTP) and no
+# response decompression, so bodies pass through byte for byte.
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+bytes = "1"
+flate2 = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 log = "0.4"
