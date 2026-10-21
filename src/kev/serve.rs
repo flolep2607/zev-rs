@@ -29,6 +29,7 @@ pub struct Job {
     state: Vec<u32>,
     rows: Vec<RowSpec>,
     reply: JobReply,
+    queued: Instant,
 }
 
 impl Job {
@@ -105,7 +106,14 @@ pub struct Health {
     pass_errors: AtomicU64,
     pass_requests: AtomicU64,
     pass_tokens: AtomicU64,
+    /// tokens the forward actually ran: rows plus the states not found in the prefix cache
+    computed_tokens: AtomicU64,
     pass_seconds: Hist,
+    /// queue entry to the start of the pass that carries the request
+    queue_seconds: Hist,
+    /// device memory after the last pass, bytes (0 without CUDA); with several workers, the last one to finish
+    gpu_mem_used: AtomicU64,
+    gpu_mem_total: AtomicU64,
     cache_hits: AtomicU64,
     cache_misses: AtomicU64,
     /// by OUTCOMES index
@@ -235,6 +243,9 @@ impl Worker {
         }
         let pack = Pack::new(seqs, &dev)?;
         let h = self.m.forward(&pack, &ids, &picks)?;
+        self.health
+            .computed_tokens
+            .fetch_add(ids.len() as u64, Ordering::Relaxed);
         let mut per_row = self.readout.run(&self.m, &h, &rows)?.into_iter();
         for (k, c) in made {
             self.cache.put(k, c);
@@ -302,9 +313,23 @@ impl Worker {
                 }
             }
             let t0 = Instant::now();
+            for j in &batch {
+                health
+                    .queue_seconds
+                    .observe(&REQUEST_BOUNDS, t0.duration_since(j.queued).as_secs_f64());
+            }
             let res = self.pass(&batch);
             let _ = self.m.dev.synchronize();
             health.last_pass_ms.store(now_ms(), Ordering::SeqCst);
+            #[cfg(feature = "cuda")]
+            if let Ok((free, total)) =
+                candle_core::cuda_backend::cudarc::driver::result::mem_get_info()
+            {
+                health
+                    .gpu_mem_used
+                    .store((total - free) as u64, Ordering::Relaxed);
+                health.gpu_mem_total.store(total as u64, Ordering::Relaxed);
+            }
             let ms = t0.elapsed().as_secs_f64() * 1e3;
             health.passes.fetch_add(1, Ordering::Relaxed);
             health
@@ -368,6 +393,7 @@ impl Served {
                 state,
                 rows,
                 reply: tx,
+                queued: Instant::now(),
             })
             .map_err(|e| match e {
                 mpsc::TrySendError::Full(_) => (
@@ -612,8 +638,17 @@ async fn metrics(
             &PASS_BOUNDS,
         );
     }
+    let _ = writeln!(out, "# HELP zev_queue_wait_seconds queue entry to the start of the pass carrying the request; request duration minus this is the pass\n# TYPE zev_queue_wait_seconds histogram");
+    for m in s.models.iter() {
+        m.health.queue_seconds.render(
+            &mut out,
+            "zev_queue_wait_seconds",
+            &label(m),
+            &REQUEST_BOUNDS,
+        );
+    }
     type Get = fn(&Health) -> u64;
-    let counters: [(&str, &str, Get); 6] = [
+    let counters: [(&str, &str, Get); 7] = [
         ("zev_passes_total", "packed passes run", |h| {
             h.passes.load(Ordering::Relaxed)
         }),
@@ -633,6 +668,11 @@ async fn metrics(
             |h| h.pass_tokens.load(Ordering::Relaxed),
         ),
         (
+            "zev_pass_computed_tokens_total",
+            "tokens the forward ran (rows + uncached states); zev_pass_tokens_total minus this is what the prefix cache saved",
+            |h| h.computed_tokens.load(Ordering::Relaxed),
+        ),
+        (
             "zev_prefix_cache_hits_total",
             "request states found in the prefix cache",
             |h| h.cache_hits.load(Ordering::Relaxed),
@@ -649,7 +689,7 @@ async fn metrics(
             let _ = writeln!(out, "{name}{{{}}} {}", label(m), get(&m.health));
         }
     }
-    let gauges: [(&str, &str, Get); 3] = [
+    let gauges: [(&str, &str, Get); 5] = [
         ("zev_in_flight", "requests queued or running", |h| {
             h.in_flight.load(Ordering::SeqCst) as u64
         }),
@@ -660,6 +700,16 @@ async fn metrics(
             "zev_seconds_since_pass",
             "seconds since the last finished pass",
             |h| h.last_pass_ms.load(Ordering::SeqCst),
+        ),
+        (
+            "zev_gpu_memory_used_bytes",
+            "device memory in use after the last pass (0 without CUDA)",
+            |h| h.gpu_mem_used.load(Ordering::Relaxed),
+        ),
+        (
+            "zev_gpu_memory_total_bytes",
+            "device memory size (0 without CUDA)",
+            |h| h.gpu_mem_total.load(Ordering::Relaxed),
         ),
     ];
     for (name, help, get) in gauges {
