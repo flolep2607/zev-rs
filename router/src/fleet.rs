@@ -49,6 +49,8 @@ fn default_pool() -> String {
 
 /// What a rented box's inflate_mw decodes. On 1,333 captured agent prompts (mean 79 KB, newest quarter, dictionary
 /// trained on the older three): zlib 1 2.86x, zstd 3 3.58x, zstd 3 + a 110 KB dictionary 16.1x at 0.3 ms a body.
+/// Across days it is ~6.8x (a 19-24 Aug dictionary on the newest 24 Aug prompts): same-day prompts share whole
+/// pages, later ones only the system prompt and tool schemas. Retrain the dictionary as prompts drift.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum Compress {
     #[default]
@@ -130,7 +132,7 @@ pub struct Config {
     /// zlib level for `deflate` boxes. 1: 2.7x for 0.5 ms on these prompts, against 3.2x for 6 ms at level 6.
     #[serde(default = "one32")]
     pub compress_level: u32,
-    /// zstd level for `zstd` boxes. 3: 3.6x alone, 16x with the dictionary, faster than zlib 1 either way.
+    /// zstd level for `zstd` boxes. 3: 3.6x alone, ~6.8x with the dictionary, faster than zlib 1 either way.
     #[serde(default = "three32")]
     pub zstd_level: i32,
     /// A zstd dictionary trained on captured prompts (vast/train_zstd_dict.py). The box must hold the same file:

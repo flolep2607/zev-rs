@@ -49,7 +49,10 @@ HTTP/3 (QUIC) is not offered: neither server speaks it, and on a LAN it buys not
 
 They are metered per GB and 96% of their traffic is inbound prompt (84 KB in, 3.2 KB out). On 1,333 captured agent
 prompts, dictionary trained on the older three quarters and measured on the newest: zlib 1 2.86x (1.2 ms), zstd 3
-3.58x (0.7 ms), **zstd 3 + a 110 KB trained dictionary 16.1x (0.3 ms)**, 4.9 KB on the wire instead of 27.6 KB.
+3.58x (0.7 ms), zstd 3 + a 110 KB trained dictionary 16.1x (0.3 ms). That last figure is one capture: its prompts
+share whole pages. **Across days it is ~6.8x** (dictionary from the 19 and 24 Aug captures, measured on the newest
+quarter of 24 Aug; a 19 Aug dictionary alone gets 8.0x on all of 24 Aug), ~2.5x fewer bytes than zlib. Retrain the
+dictionary as prompts drift.
 `vast/train_zstd_dict.py` trains it from a capture; the same file is `zstd_dict` here and is baked next to
 `inflate_mw.py` in the box image, and vast-holo marks such a box `+zstd`. A frame names its dictionary id, so a box
 with another dictionary answers 400 rather than misreading the prompt. The dictionary holds the prompts' most
