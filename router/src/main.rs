@@ -1,6 +1,6 @@
-//! zev-router: one load-aware router for the Kev (zev-fast) and vLLM pools, a port of learning-helm's florian-nginx.
+//! inference_router_rs: one load-aware router for the Kev (zev-fast) and vLLM pools, a port of learning-helm's florian-nginx.
 //!
-//!   zev-router router.json
+//!   inference_router_rs router.json
 //!
 //! Pingora is the server (HTTP/1 + h2 downstream, threads, graceful restart). Forwarding is ours, through a
 //! keep-alive reqwest client, because three decisions need the whole body before a pod is chosen -- the image check,
@@ -502,7 +502,7 @@ impl ProxyHttp for Router {
                 let mut m = self.fleet.prometheus();
                 if let Some(c) = &self.capture {
                     let n = c.dropped.load(std::sync::atomic::Ordering::Relaxed);
-                    m.push_str(&format!("# TYPE zev_router_capture_dropped_total counter\nzev_router_capture_dropped_total {n}\n"));
+                    m.push_str(&format!("# TYPE inference_router_capture_dropped_total counter\ninference_router_capture_dropped_total {n}\n"));
                 }
                 respond(session, 200, "text/plain; version=0.0.4", m).await?
             }
@@ -560,7 +560,7 @@ fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     let path = std::env::args()
         .nth(1)
-        .expect("usage: zev-router <config.json>");
+        .expect("usage: inference_router_rs <config.json>");
     let cfg: Config = serde_json::from_str(&std::fs::read_to_string(&path).expect("read config"))
         .expect("parse config");
     let fleet = Arc::new(Fleet::new(cfg.clone()));

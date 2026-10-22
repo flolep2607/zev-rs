@@ -78,7 +78,7 @@ fn dict_size() -> usize {
     110_000
 }
 fn lease_name() -> String {
-    "zev-router-zdict".into()
+    "inference-router-rs-zdict".into()
 }
 fn dict_key() -> String {
     "prompts.zdict".into()
@@ -419,37 +419,37 @@ impl Trainer {
         };
         g(
             out,
-            "zev_router_zdict_leader",
+            "inference_router_zdict_leader",
             "1 if this replica trains the zstd dictionary",
             self.leader.load(Ordering::Relaxed) as u8 as f64,
         );
         g(
             out,
-            "zev_router_zdict_samples",
+            "inference_router_zdict_samples",
             "bodies kept for the next training",
             n as f64,
         );
         g(
             out,
-            "zev_router_zdict_live_ratio",
+            "inference_router_zdict_live_ratio",
             "raw/compressed bytes sent to zstd boxes, last ~500 bodies (0 = too few)",
             self.live().unwrap_or(0.0),
         );
         g(
             out,
-            "zev_router_zdict_baseline_ratio",
+            "inference_router_zdict_baseline_ratio",
             "held-out ratio of the dictionary in use when last measured (0 = not yet)",
             st.baseline.unwrap_or(0.0),
         );
         g(
             out,
-            "zev_router_zdict_last_training_timestamp_seconds",
+            "inference_router_zdict_last_training_timestamp_seconds",
             "end of the last training (0 = none)",
             st.last_run_unix.unwrap_or(0) as f64,
         );
         g(
             out,
-            "zev_router_zdict_trainings",
+            "inference_router_zdict_trainings",
             "trainings run by this replica",
             st.trainings as f64,
         );

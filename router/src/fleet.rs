@@ -1152,44 +1152,44 @@ impl Fleet {
         let mut out = String::new();
         let gauges = [
             (
-                "zev_router_pod_held",
+                "inference_router_pod_held",
                 "requests this replica dispatched to the pod and not yet released",
             ),
             (
-                "zev_router_pod_cap",
+                "inference_router_pod_cap",
                 "admission cap for the pod on this replica",
             ),
             (
-                "zev_router_pod_score",
+                "inference_router_pod_score",
                 "spare capacity x card weight; 0 = not selectable",
             ),
             (
-                "zev_router_pod_load",
+                "inference_router_pod_load",
                 "running + waiting from the pod's own /metrics",
             ),
             (
-                "zev_router_pod_stalled",
+                "inference_router_pod_stalled",
                 "1 if the pod's step counter froze with work queued; skipped",
             ),
             (
-                "zev_router_pod_failing",
+                "inference_router_pod_failing",
                 "1 if the pod failed a request or a scrape in the last 30 s; scored down",
             ),
             (
-                "zev_router_pod_weight",
+                "inference_router_pod_weight",
                 "learned routing weight (gpu_multiplier until rates are measured)",
             ),
-            ("zev_router_pod_seed_weight", "configured gpu_multiplier"),
+            ("inference_router_pod_seed_weight", "configured gpu_multiplier"),
             (
-                "zev_router_pod_rate",
+                "inference_router_pod_rate",
                 "busy-only service rate, tokens/s (0 = not measured)",
             ),
             (
-                "zev_router_pod_limit",
+                "inference_router_pod_limit",
                 "adaptive in-flight limit on this replica",
             ),
             (
-                "zev_router_pod_latency_baseline_seconds",
+                "inference_router_pod_latency_baseline_seconds",
                 "long-run time to response headers the limit compares against",
             ),
         ];
@@ -1218,55 +1218,55 @@ impl Fleet {
                 );
             }
         }
-        let _ = writeln!(out, "# HELP zev_router_pod_model 1 per model or LoRA adapter the pod lists on /v1/models (parent = base model of an adapter)\n# TYPE zev_router_pod_model gauge");
+        let _ = writeln!(out, "# HELP inference_router_pod_model 1 per model or LoRA adapter the pod lists on /v1/models (parent = base model of an adapter)\n# TYPE inference_router_pod_model gauge");
         for p in pods.iter() {
             let st = p.state.lock().unwrap();
             for m in &st.models {
                 let esc = |s: &str| s.replace('\\', "\\\\").replace('"', "\\\"");
                 let _ = writeln!(
                     out,
-                    "zev_router_pod_model{{pool=\"{}\",upstream=\"{}\",pod=\"{}\",model=\"{}\",parent=\"{}\",max_len=\"{}\"}} 1",
+                    "inference_router_pod_model{{pool=\"{}\",upstream=\"{}\",pod=\"{}\",model=\"{}\",parent=\"{}\",max_len=\"{}\"}} 1",
                     p.up.pool, p.up.name, p.addr, esc(&m.id), esc(m.parent.as_deref().unwrap_or("")),
                     m.max_len.map_or(String::new(), |l| l.to_string())
                 );
             }
         }
         let place = self.placement.read().unwrap();
-        let _ = writeln!(out, "# HELP zev_router_pod_info 1 per pod with its node and GPU model from the Kubernetes API\n# TYPE zev_router_pod_info gauge");
+        let _ = writeln!(out, "# HELP inference_router_pod_info 1 per pod with its node and GPU model from the Kubernetes API\n# TYPE inference_router_pod_info gauge");
         for p in pods.iter() {
             if let Some((node, gpu)) = place.get(&p.addr.ip()) {
                 let _ = writeln!(
                     out,
-                    "zev_router_pod_info{{pool=\"{}\",upstream=\"{}\",pod=\"{}\",node=\"{node}\",gpu=\"{}\"}} 1",
+                    "inference_router_pod_info{{pool=\"{}\",upstream=\"{}\",pod=\"{}\",node=\"{node}\",gpu=\"{}\"}} 1",
                     p.up.pool, p.up.name, p.addr, gpu.as_deref().unwrap_or("")
                 );
             }
         }
-        let _ = writeln!(out, "# HELP zev_router_pod_box_dict zstd dictionary id a rented box reports holding (0 = none)\n# TYPE zev_router_pod_box_dict gauge");
+        let _ = writeln!(out, "# HELP inference_router_pod_box_dict zstd dictionary id a rented box reports holding (0 = none)\n# TYPE inference_router_pod_box_dict gauge");
         for p in pods.iter().filter(|p| p.up.compress == Compress::Zstd) {
             let id = p.state.lock().unwrap().box_dict.unwrap_or(0);
             let _ = writeln!(
                 out,
-                "zev_router_pod_box_dict{{pool=\"{}\",upstream=\"{}\",pod=\"{}\"}} {id}",
+                "inference_router_pod_box_dict{{pool=\"{}\",upstream=\"{}\",pod=\"{}\"}} {id}",
                 p.up.pool, p.up.name, p.addr
             );
         }
-        let _ = writeln!(out, "# HELP zev_router_zstd_dict_id the dictionary id this router compresses with (0 = none)\n# TYPE zev_router_zstd_dict_id gauge");
+        let _ = writeln!(out, "# HELP inference_router_zstd_dict_id the dictionary id this router compresses with (0 = none)\n# TYPE inference_router_zstd_dict_id gauge");
         let _ = writeln!(
             out,
-            "zev_router_zstd_dict_id {}",
+            "inference_router_zstd_dict_id {}",
             self.zdict().map_or(0, |d| d.id)
         );
         if let Some(t) = &self.train {
             t.prometheus(&mut out);
         }
-        let _ = writeln!(out, "# HELP zev_router_drained 1 while /drain holds admission closed\n# TYPE zev_router_drained gauge");
-        let _ = writeln!(out, "zev_router_drained {}", self.drained() as u8);
-        let _ = writeln!(out, "# HELP zev_router_responses_total responses by pool and status class\n# TYPE zev_router_responses_total counter");
+        let _ = writeln!(out, "# HELP inference_router_drained 1 while /drain holds admission closed\n# TYPE inference_router_drained gauge");
+        let _ = writeln!(out, "inference_router_drained {}", self.drained() as u8);
+        let _ = writeln!(out, "# HELP inference_router_responses_total responses by pool and status class\n# TYPE inference_router_responses_total counter");
         for ((pool, class), n) in self.responses.lock().unwrap().iter() {
             let _ = writeln!(
                 out,
-                "zev_router_responses_total{{pool=\"{pool}\",status=\"{class}\"}} {n}"
+                "inference_router_responses_total{{pool=\"{pool}\",status=\"{class}\"}} {n}"
             );
         }
         out
@@ -1772,7 +1772,7 @@ mod tests {
 
     #[test]
     fn zstd_waits_for_the_box_to_hold_our_dictionary() {
-        let dir = std::env::temp_dir().join(format!("zev-router-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("inference_router_rs-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("d.zdict");
         let train = |w: &str| {

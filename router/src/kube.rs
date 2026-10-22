@@ -51,7 +51,7 @@ impl Kube {
             .or_else(|| std::fs::read_to_string(format!("{SA}/namespace")).ok())
             .unwrap_or_else(|| "default".into());
         let id = std::env::var("HOSTNAME")
-            .unwrap_or_else(|_| format!("zev-router-{:08x}", rand::random::<u32>()));
+            .unwrap_or_else(|_| format!("inference-router-rs-{:08x}", rand::random::<u32>()));
         Some(Kube {
             http: b.build().expect("kube client"),
             base,

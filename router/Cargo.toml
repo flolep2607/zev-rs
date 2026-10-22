@@ -1,5 +1,5 @@
 [package]
-name = "zev-router"
+name = "inference_router_rs"
 version = "0.1.0"
 edition = "2021"
 description = "Load-aware router for zev (Kev) and vLLM pools: pools by path, per-pod scoring from /metrics, admission caps, stall detection, failover"

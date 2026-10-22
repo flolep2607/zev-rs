@@ -1,10 +1,10 @@
-# zev-router
+# inference_router_rs
 
 One load-aware router for the Kev (zev-fast) and vLLM pools, a port of learning-helm's `florian-nginx`
 (OpenResty + Lua) to Rust on [Pingora](https://github.com/cloudflare/pingora).
 
     cargo build --release
-    zev-router router.json
+    inference_router_rs router.json
 
 Pingora is the server (HTTP/1 and h2 downstream, worker threads, graceful restart). Forwarding is the router's own,
 through reqwest (hyper underneath): the image check, the `model` pool and per-pod compression all need the whole body
@@ -90,7 +90,7 @@ the newest quarter. With no dictionary loaded, it measures against plain zstd. T
 is `margin` (3%) better. Either way the measured ratio becomes the new baseline. Both ratios and the verdict are
 logged and shown.
 
-**One replica trains.** A Kubernetes Lease (`lease`, default `zev-router-zdict`, `lease_s` 30) elects it, renewed every
+**One replica trains.** A Kubernetes Lease (`lease`, default `inference-router-rs-zdict`, `lease_s` 30) elects it, renewed every
 tick. Expiry is judged as client-go does: a Lease whose record has not changed for `lease_s` by our own clock, so no
 two clocks are compared. The leader writes the dictionary as `binaryData[key]` of the ConfigMap `configmap`. Every
 replica mounts that ConfigMap as the directory holding `zstd_dict`, so the kubelet refreshes the file (within about a
@@ -103,10 +103,10 @@ Mount the whole ConfigMap as a directory, **not with `subPath`**: a subPath moun
 ```yaml
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
-metadata: { name: zev-router-zdict }
+metadata: { name: inference-router-rs-zdict }
 rules:
-  - { apiGroups: [coordination.k8s.io], resources: [leases], resourceNames: [zev-router-zdict], verbs: [get, update] }
-  - { apiGroups: [""], resources: [configmaps], resourceNames: [zev-router-zdict], verbs: [get, update] }
+  - { apiGroups: [coordination.k8s.io], resources: [leases], resourceNames: [inference-router-rs-zdict], verbs: [get, update] }
+  - { apiGroups: [""], resources: [configmaps], resourceNames: [inference-router-rs-zdict], verbs: [get, update] }
   # create cannot be limited by name; drop these two once the Lease and ConfigMap exist
   - { apiGroups: [coordination.k8s.io], resources: [leases], verbs: [create] }
   - { apiGroups: [""], resources: [configmaps], verbs: [create] }
@@ -144,7 +144,7 @@ is `min_inflight × replicas`.
 
 **Placement.** With a Kubernetes client (in-cluster, or `kube_api`), the router lists the Running pods of its namespace
 every minute and reads each node's `nvidia.com/gpu.product` label. `/balancer-status` shows `node` and `gpu`, and
-`/metrics` shows `zev_router_pod_info{node,gpu}`. This is display only. It needs `list pods` in the namespace and
+`/metrics` shows `inference_router_pod_info{node,gpu}`. This is display only. It needs `list pods` in the namespace and
 `get nodes` (a ClusterRole). Without them, or for a rented box, nothing is shown and a warning is logged.
 
 ```yaml
@@ -152,7 +152,7 @@ every minute and reads each node's `nvidia.com/gpu.product` label. `/balancer-st
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
-metadata: { name: zev-router-nodes }
+metadata: { name: inference-router-rs-nodes }
 rules: [{ apiGroups: [""], resources: [nodes], verbs: [get] }]
 ```
 
@@ -177,11 +177,11 @@ discovered facts.
   `box_dict`; configured `text_only`, `compress`, `http2`, `external`; learned `weight`, `seed_weight`, `rate`, `limit`,
   `room`, `latency_s`, `latency_baseline_s`; `node`, `gpu`), the router's `zstd_dict` id, `drained_s`, and
   `autotrain` (leader, samples, live and baseline ratios, trainings, last reason/result/ratios/time).
-- `/metrics`: `zev_router_pod_{held,cap,score,load,stalled,failing,weight,seed_weight,rate,limit}`,
-  `zev_router_pod_latency_baseline_seconds`, `zev_router_pod_info{node,gpu}`, `zev_router_pod_model{model,parent,max_len}`
-  (one series per model or adapter a pod lists), `zev_router_pod_box_dict`, `zev_router_zstd_dict_id`,
-  `zev_router_responses_total{pool,status}`, `zev_router_drained`, `zev_router_capture_dropped_total`, and with
-  `autotrain` `zev_router_zdict_{leader,samples,live_ratio,baseline_ratio,trainings,last_training_timestamp_seconds}`.
+- `/metrics`: `inference_router_pod_{held,cap,score,load,stalled,failing,weight,seed_weight,rate,limit}`,
+  `inference_router_pod_latency_baseline_seconds`, `inference_router_pod_info{node,gpu}`, `inference_router_pod_model{model,parent,max_len}`
+  (one series per model or adapter a pod lists), `inference_router_pod_box_dict`, `inference_router_zstd_dict_id`,
+  `inference_router_responses_total{pool,status}`, `inference_router_drained`, `inference_router_capture_dropped_total`, and with
+  `autotrain` `inference_router_zdict_{leader,samples,live_ratio,baseline_ratio,trainings,last_training_timestamp_seconds}`.
 - `/drain[?seconds=N]`: close admission for N s (default `drain_seconds`, 0 reopens) and cut every request in flight,
   on every replica: with `peers_dns` it fans out to each one with `&peer=1`. Refused (403) with an
   `X-Forwarded-For`, i.e. through an ingress. A TTL: a drain nobody lifts expires.
@@ -200,10 +200,10 @@ or past `max_pending` events in flight, nothing is captured. Delivery is one sho
   "listen": "0.0.0.0:8000", "replicas": 2, "threads": 4,
   "pool_paths": { "/v1/systemone": "kev" },
   "pool_models": {},
-  "zstd_dict": "/etc/zev-router/zdict/prompts.zdict",
+  "zstd_dict": "/etc/inference-router-rs/zdict/prompts.zdict",
   "autotrain": {},
-  "peers_dns": "argo-workflow-zev-router-peers.argo.svc.cluster.local",
-  "external_file": "/etc/zev-router/external/endpoints.json",
+  "peers_dns": "argo-workflow-inference-router-rs-peers.argo.svc.cluster.local",
+  "external_file": "/etc/inference-router-rs/external/endpoints.json",
   "capture": { "endpoint": "http://172.17.16.214:9009/events" },
   "upstreams": [
     { "name": "kev-backfill-4090", "pool": "kev", "port": 8008, "gpu_multiplier": 10, "max_inflight": 64,
@@ -222,7 +222,7 @@ replica under-admits, the safe direction). Defaults: `metrics_interval_s` 5, `st
 `compress_min` 4096, `compress_level` 1 (zlib), `zstd_level` 3, `max_body_bytes` 100 MiB; capture: `check_interval_s` 30,
 `max_request_bytes` 25 MiB, `max_response_bytes` 2 MiB, `max_pending` 2, `timeout_ms` 500; autotrain: `every_s` 86400,
 `min_interval_s` 3600, `drift` 0.8, `margin` 0.03, `min_samples` 500, `max_samples` 2000, `max_bytes` 130 MiB,
-`dict_bytes` 110000, `lease`/`configmap` `zev-router-zdict`, `key` `prompts.zdict`, `lease_s` 30. `min_inflight` 1;
+`dict_bytes` 110000, `lease`/`configmap` `inference-router-rs-zdict`, `key` `prompts.zdict`, `lease_s` 30. `min_inflight` 1;
 `kube_api` in-cluster, `kube_namespace` the pod's.
 
 ## Against florian-nginx
@@ -256,7 +256,7 @@ temp file instead); vLLM pods stay on HTTP/1.1 keep-alive (uvicorn has no HTTP/2
                             # the leader is killed.
 
 To exercise the Lease for real, run two replicas with `autotrain` in a namespace that has the Role above.
-`kubectl get lease zev-router-zdict -o yaml` shows the holder. Delete the holder pod: the other replica takes over
+`kubectl get lease inference-router-rs-zdict -o yaml` shows the holder. Delete the holder pod: the other replica takes over
 within `lease_s`. For a quick end-to-end run, set `min_samples: 50, every_s: 600`.
 
 Live, 2026-10-21: 200 real `/v1/systemone` calls through the router to the Kev NodePorts in 2.8 s, all 2xx.

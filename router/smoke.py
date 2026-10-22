@@ -1,7 +1,7 @@
 """End-to-end checks against the real binary: fake zev/vLLM pods, a fake capture receiver, a rented-box Secret file,
 and two rented boxes running the real vast/inflate_mw.py under uvicorn. Each block asserts one behaviour.
 
-    cargo build && cargo build --example fake_h2c_pod && python3 smoke.py [path/to/zev-router]
+    cargo build && cargo build --example fake_h2c_pod && python3 smoke.py [path/to/inference_router_rs]
 
 Needs python3 with zstandard, fastapi and uvicorn; INFLATE_MW points at inflate_mw.py (default: the price-compare
 checkout at /data/vllm/vast/inflate_mw.py).
@@ -22,7 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import zstandard  # the rented boxes' decoder
 
-BIN = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("CARGO_TARGET_DIR", "target") + "/debug/zev-router"
+BIN = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("CARGO_TARGET_DIR", "target") + "/debug/inference_router_rs"
 INFLATE_MW = os.environ.get("INFLATE_MW", "/data/vllm/vast/inflate_mw.py")
 seen = {}  # pod name -> list of (headers, raw body, decoded body)
 wedged = {"in_flight": 0}  # 0 at first: a frozen counter is not a stall until work queues
@@ -398,7 +398,7 @@ try:
     _, st = status()
     assert [m["id"] for m in st["lora"]["models"]] == ["holo", "lora-a"] and st["lora"]["models"][1]["parent"] == "holo"
     metrics = urllib.request.urlopen(URL + "/metrics").read().decode()
-    assert 'model="lora-a",parent="holo"' in metrics and "zev_router_zstd_dict_id" in metrics
+    assert 'model="lora-a",parent="holo"' in metrics and "inference_router_zstd_dict_id" in metrics
     print("  models: LoRA pinned to its pod, kev-combo by discovery, vanished model -> 503 fast")
 
     # 6. Capture: request + response events joined by capture_id for the vLLM pool, nothing for Kev.

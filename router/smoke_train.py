@@ -2,7 +2,7 @@
 ConfigMap; on a ConfigMap write it writes the file the way the kubelet refreshes a mounted ConfigMap), and one rented
 box running the real vast/inflate_mw.py.
 
-    cargo build && python3 smoke_train.py [path/to/zev-router]
+    cargo build && python3 smoke_train.py [path/to/inference_router_rs]
 
 Checks: only the Lease holder trains; its first dictionary beats plain zstd, goes to the ConfigMap, both replicas
 load it and the box is pushed it; a later training on the same traffic is rejected as not better; when the leader
@@ -23,7 +23,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import zstandard
 
-BIN = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("CARGO_TARGET_DIR", "target") + "/debug/zev-router"
+BIN = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("CARGO_TARGET_DIR", "target") + "/debug/inference_router_rs"
 INFLATE_MW = os.environ.get("INFLATE_MW", "/data/vllm/vast/inflate_mw.py")
 tmp = tempfile.mkdtemp()
 DICT_FILE = os.path.join(tmp, "prompts.zdict")  # absent at first: plain zstd until a dictionary is trained
@@ -60,7 +60,7 @@ class Api(BaseHTTPRequestHandler):
         if o.get("kind") == "ConfigMap" or "/configmaps/" in key:  # the kubelet's refresh of the mounted file
             open(DICT_FILE + ".tmp", "wb").write(base64.b64decode(o["binaryData"]["prompts.zdict"]))
             os.replace(DICT_FILE + ".tmp", DICT_FILE)
-            holder = objs.get("/apis/coordination.k8s.io/v1/namespaces/t/leases/zev-router-zdict", {}).get("spec", {})
+            holder = objs.get("/apis/coordination.k8s.io/v1/namespaces/t/leases/inference-router-rs-zdict", {}).get("spec", {})
             cm_writes.append(holder.get("holderIdentity"))
         self.reply(200, o)
 
@@ -215,7 +215,7 @@ try:
     pod = status(other)["pods"][0]
     assert pod["node"] == "gpuworker-t" and pod["gpu"] == "NVIDIA-GeForce-RTX-4090", pod
     metrics = urllib.request.urlopen(f"http://127.0.0.1:{PORTS[other]}/metrics").read().decode()
-    assert "zev_router_zdict_leader 1" in metrics and "zev_router_zdict_live_ratio" in metrics
+    assert "inference_router_zdict_leader 1" in metrics and "inference_router_zdict_live_ratio" in metrics
     print(f"smoke_train ok: {len(codes)} requests, 0 failed")
 finally:
     for p in routers.values():
