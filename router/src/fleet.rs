@@ -30,9 +30,14 @@ pub struct Upstream {
     /// Started with --language-model-only: an image request 400s there, and 4xx is not retried.
     #[serde(default)]
     pub text_only: bool,
-    /// Inflates a `Content-Encoding: deflate` request body (vLLM with inflate_mw). Rented boxes are metered per GB.
+    /// Request-body compression, for rented boxes only: they are metered per GB and 96% of their traffic is
+    /// inbound prompt. Never configurable for an in-cluster upstream: on the LAN it is CPU spent for nothing.
+    #[serde(skip)]
+    pub compress: Compress,
+    /// Speaks h2c (HTTP/2 over plain TCP, prior knowledge): one long-lived connection per pod carries every request,
+    /// pinged so a dead one is noticed while idle. zev with axum's http2 feature does; vLLM's uvicorn does not.
     #[serde(default)]
-    pub deflate: bool,
+    pub http2: bool,
     /// Rented boxes run vLLM with --api-key; sent to them only, never to an in-cluster pod.
     #[serde(skip)]
     pub api_key: Option<String>,
@@ -40,6 +45,16 @@ pub struct Upstream {
 
 fn default_pool() -> String {
     "default".into()
+}
+
+/// What a rented box's inflate_mw decodes. On 1,333 captured agent prompts (mean 79 KB, newest quarter, dictionary
+/// trained on the older three): zlib 1 2.86x, zstd 3 3.58x, zstd 3 + a 110 KB dictionary 16.1x at 0.3 ms a body.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum Compress {
+    #[default]
+    None,
+    Deflate,
+    Zstd,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -109,12 +124,19 @@ pub struct Config {
     pub external_file: Option<String>,
     #[serde(default = "forty")]
     pub external_max_inflight: usize,
-    /// Deflate request bodies at least this big for pods that inflate them; 0 = never.
+    /// Compress request bodies at least this big for rented boxes that decode them; 0 = never.
     #[serde(default = "kib4")]
     pub compress_min: usize,
-    /// Level 1: 2.7x for 0.5 ms on these prompts, against 3.2x for 6 ms at level 6.
+    /// zlib level for `deflate` boxes. 1: 2.7x for 0.5 ms on these prompts, against 3.2x for 6 ms at level 6.
     #[serde(default = "one32")]
     pub compress_level: u32,
+    /// zstd level for `zstd` boxes. 3: 3.6x alone, 16x with the dictionary, faster than zlib 1 either way.
+    #[serde(default = "three32")]
+    pub zstd_level: i32,
+    /// A zstd dictionary trained on captured prompts (vast/train_zstd_dict.py). The box must hold the same file:
+    /// the frame names its dictionary id, so a box without it answers 400 rather than guessing.
+    #[serde(default)]
+    pub zstd_dict: Option<String>,
     #[serde(default = "mib100")]
     pub max_body_bytes: usize,
 }
@@ -151,6 +173,9 @@ fn three() -> f64 {
 }
 fn one32() -> u32 {
     1
+}
+fn three32() -> i32 {
+    3
 }
 fn port8000() -> u16 {
     8000
@@ -226,8 +251,13 @@ pub fn external_upstreams(json: &str, default_cap: usize) -> Vec<Upstream> {
         max_inflight: Option<usize>,
         #[serde(default)]
         deflate: bool,
+        /// Its image has zstandard and the dictionary (vast-holo's +zstd mark). Wins over deflate.
+        #[serde(default)]
+        zstd: bool,
         #[serde(default)]
         text_only: bool,
+        #[serde(default)]
+        http2: bool,
     }
     #[derive(Deserialize)]
     struct Doc {
@@ -257,7 +287,12 @@ pub fn external_upstreams(json: &str, default_cap: usize) -> Vec<Upstream> {
                 gpu_multiplier: mult,
                 max_inflight: e.max_inflight.unwrap_or(default_cap),
                 text_only: e.text_only,
-                deflate: e.deflate,
+                compress: match (e.zstd, e.deflate) {
+                    (true, _) => Compress::Zstd,
+                    (false, true) => Compress::Deflate,
+                    _ => Compress::None,
+                },
+                http2: e.http2,
                 api_key: key.clone(),
             })
         })
@@ -366,10 +401,36 @@ pub struct Fleet {
     /// Bumped by /drain: every in-flight request watching it drops its upstream connection, which aborts the
     /// generation. nginx needed a reload for that; here it is a channel.
     pub cut: watch::Sender<u64>,
+    /// HTTP/1.1 keep-alive pool: up to 64 idle connections per pod, reused across requests.
+    h1: reqwest::Client,
+    /// h2c: one connection per pod, multiplexing every request, kept for good and pinged every 10 s so a peer that
+    /// vanished (node NotReady, SYN blackholed) is noticed before a request is sent into it.
+    h2: reqwest::Client,
 }
+
+/// A dead node blackholes SYN rather than refusing it; the default would be a long wait before failover starts.
+pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
 
 impl Fleet {
     pub fn new(cfg: Config) -> Self {
+        let tcp = || {
+            reqwest::Client::builder()
+                .connect_timeout(CONNECT_TIMEOUT)
+                .tcp_keepalive(Duration::from_secs(30))
+        };
+        let h1 = tcp()
+            .pool_max_idle_per_host(64)
+            .build()
+            .expect("http/1.1 client");
+        let h2 = tcp()
+            .http2_prior_knowledge()
+            .http2_keep_alive_interval(Duration::from_secs(10))
+            .http2_keep_alive_timeout(Duration::from_secs(5))
+            .http2_keep_alive_while_idle(true)
+            .http2_adaptive_window(true)
+            .pool_idle_timeout(None)
+            .build()
+            .expect("h2c client");
         Fleet {
             cfg,
             pods: RwLock::new(Vec::new()),
@@ -377,6 +438,22 @@ impl Fleet {
             responses: Mutex::new(HashMap::new()),
             drained_until: Mutex::new(None),
             cut: watch::channel(0).0,
+            h1,
+            h2,
+        }
+    }
+
+    /// For plain HTTP/1.1 calls of the router's own (the /drain fan-out to its peers).
+    pub fn http1(&self) -> &reqwest::Client {
+        &self.h1
+    }
+
+    /// The client for this upstream's protocol.
+    pub fn client(&self, up: &Upstream) -> &reqwest::Client {
+        if up.http2 {
+            &self.h2
+        } else {
+            &self.h1
         }
     }
 
@@ -585,14 +662,18 @@ impl Fleet {
 
     /// One scrape of every pod's /metrics. A failed scrape marks the pod failing and keeps its last sample: zeros
     /// would score a hung pod as idle, the most attractive backend there is.
-    pub async fn scrape(&self, http: &reqwest::Client) {
+    pub async fn scrape(&self) {
         let pods: Vec<Arc<Pod>> = self.pods.read().unwrap().clone();
         let stall = self.stall();
         let mut set = tokio::task::JoinSet::new();
         for p in pods {
-            let http = http.clone();
+            // Over the pod's own connection: on h2 the scrape rides the request stream's connection, and a scrape
+            // that fails is also news about that connection.
+            let http = self.client(&p.up).clone();
             set.spawn(async move {
-                let mut req = http.get(format!("http://{}/metrics", p.addr));
+                let mut req = http
+                    .get(format!("http://{}/metrics", p.addr))
+                    .timeout(Duration::from_secs(2));
                 if let Some(key) = &p.up.api_key {
                     req = req.bearer_auth(key);
                 }
@@ -639,7 +720,9 @@ impl Fleet {
                     "running": st.sample.running, "waiting": st.sample.waiting, "kv_cache": st.sample.kv_cache,
                     "iterations": st.sample.iterations, "stalled": Pod::stalled(&st, now, stall),
                     "failing": st.failing_until.is_some_and(|t| now < t),
-                    "text_only": p.up.text_only, "deflate": p.up.deflate, "external": p.up.api_key.is_some(),
+                    "text_only": p.up.text_only, "compress": format!("{:?}", p.up.compress).to_lowercase(),
+                    "http2": p.up.http2,
+                    "external": p.up.api_key.is_some(),
                     "seconds_since_scrape": st.last_seen.map(|t| now.duration_since(t).as_secs_f64()),
                 })
             })
@@ -732,7 +815,8 @@ mod tests {
             gpu_multiplier: mult,
             max_inflight: cap,
             text_only: false,
-            deflate: false,
+            compress: Compress::None,
+            http2: false,
             api_key: None,
         })
     }
@@ -959,12 +1043,24 @@ mod tests {
         let json = r#"{"api_key":"s3cret","endpoints":[
             {"name":"vast-1","ip":"1.2.3.4","port":41234,"gpu_multiplier":12.7,"max_inflight":41,"deflate":true},
             {"name":"no-weight","ip":"5.6.7.8","port":41235},
-            {"ip":"9.9.9.9","port":8000,"gpu_multiplier":10}]}"#;
+            {"ip":"9.9.9.9","port":8000,"gpu_multiplier":10},
+            {"ip":"9.9.9.8","port":8000,"gpu_multiplier":10,"deflate":true,"zstd":true}]}"#;
         let ups = external_upstreams(json, 40);
-        assert_eq!(ups.len(), 2, "an entry without gpu_multiplier is refused");
+        assert_eq!(ups.len(), 3, "an entry without gpu_multiplier is refused");
         assert_eq!(
-            (ups[0].gpu_multiplier, ups[0].max_inflight, ups[0].deflate),
-            (12.7, 41, true)
+            (ups[0].gpu_multiplier, ups[0].max_inflight, ups[0].compress),
+            (12.7, 41, Compress::Deflate)
+        );
+        assert_eq!(ups[1].compress, Compress::None, "no mark, no compression");
+        assert_eq!(ups[2].compress, Compress::Zstd, "zstd wins over deflate");
+        let cfg: Config = serde_json::from_str(
+            r#"{"listen":"0:0","upstreams":[{"name":"lan","gpu_multiplier":1,"max_inflight":1,"deflate":true,"compress":"zstd"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            cfg.upstreams[0].compress,
+            Compress::None,
+            "an in-cluster upstream can never compress"
         );
         assert_eq!(
             ups[1].max_inflight, 40,

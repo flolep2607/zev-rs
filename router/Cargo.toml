@@ -14,13 +14,19 @@ async-trait = "0.1"
 # <1.54: tokio 1.54 asserts a non-zero BufStream capacity, and pingora 0.9 builds every accepted TCP stream with
 # capacity 0, so the proxy thread panics on its first connection. Lift once pingora sizes its buffers.
 tokio = { version = ">=1.40, <1.54", features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
-# json: capture events. No default features: no TLS (cluster-internal and rented boxes are plain HTTP) and no
+# json: capture events; http2: h2c to pods that speak it. No default features: no TLS (cluster-internal and rented boxes are plain HTTP) and no
 # response decompression, so bodies pass through byte for byte.
-reqwest = { version = "0.12", default-features = false, features = ["json"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "http2"] }
 bytes = "1"
 flate2 = "1"
+# zstd + a trained dictionary for rented boxes: 16x on captured prompts against zlib 1's 2.9x.
+zstd = "0.13"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 log = "0.4"
 env_logger = "0.11"
 rand = "0.8"
+
+[dev-dependencies]
+# examples/fake_h2c_pod.rs only: a zev-like pod speaking HTTP/1.1 and h2c, as axum's serve does for zev.
+axum = { version = "0.8", features = ["http2"] }

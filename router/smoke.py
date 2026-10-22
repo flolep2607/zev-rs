@@ -14,6 +14,8 @@ import time
 import urllib.error
 import urllib.request
 import zlib
+
+import zstandard  # pip install zstandard: the rented boxes' decoder, mirrored by the fakes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 BIN = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("CARGO_TARGET_DIR", "target") + "/debug/zev-router"
@@ -49,7 +51,9 @@ def fake(name, mode="ok"):
 
         def do_POST(self):
             raw = self.rfile.read(int(self.headers["content-length"]))
-            body = zlib.decompress(raw) if self.headers.get("content-encoding") == "deflate" else raw
+            enc = self.headers.get("content-encoding")
+            body = (zlib.decompress(raw) if enc == "deflate"
+                    else zstandard.ZstdDecompressor(dict_data=ZDICT).decompress(raw) if enc == "zstd" else raw)
             seen.setdefault(name, []).append(({k.lower(): v for k, v in self.headers.items()}, raw, body))
             if mode == "wedged":
                 return self.reply(429, b'{"detail":"inference queue saturated"}')
@@ -95,9 +99,21 @@ threading.Thread(target=recv.serve_forever, daemon=True).start()
 
 pods = {n: fake(n, m) for n, m in [("healthy", "ok"), ("wedged", "wedged"), ("combo", "ok"), ("mm", "ok"),
                                    ("text", "ok"), ("ext", "ok"), ("aff1", "ok"), ("aff2", "ok"), ("slow", "slow")]}
+# A zev-like pod on axum's serve (HTTP/1.1 + h2c), built next to the router by `cargo build --example fake_h2c_pod`.
+H2C_BIN = os.path.join(os.path.dirname(BIN), "examples", "fake_h2c_pod")
+zev_proc = subprocess.Popen([H2C_BIN, "18190"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+pods["zev"] = "127.0.0.1:18190"
+# A zstd dictionary trained on look-alike prompts, loaded by the router (zstd_dict) and by the fake zstd box.
+ZDICT = zstandard.train_dictionary(16384, [json.dumps({"messages": [{"role": "user", "content": f"page {i} " + "y" * 300}],
+                                                       "tools": ["click", "type", "scroll"]}).encode() for i in range(300)])
+zdict_file = tempfile.mktemp(suffix=".zdict")
+open(zdict_file, "wb").write(ZDICT.as_bytes())
+pods["extz"] = fake("extz", "ok")
 ext_file = tempfile.mktemp(suffix=".json")
 json.dump({"api_key": "s3cret", "endpoints": [
     {"name": "ext", "ip": "127.0.0.1", "port": int(pods["ext"].split(":")[1]), "gpu_multiplier": 1, "deflate": True},
+    {"name": "extz", "ip": "127.0.0.1", "port": int(pods["extz"].split(":")[1]), "gpu_multiplier": 1,
+     "deflate": True, "zstd": True},
     {"name": "no-weight", "ip": "127.0.0.1", "port": 9}]}, open(ext_file, "w"))
 
 
@@ -107,15 +123,16 @@ def up(name, pool, mult=1, **kw):
 
 cfg = {
     "listen": "127.0.0.1:18089", "metrics_interval_s": 1, "stall_s": 2, "queue_timeout_s": 5,
-    "affinity_wait_s": 2, "compress_min": 1024, "external_file": ext_file,
+    "affinity_wait_s": 2, "compress_min": 1024, "external_file": ext_file, "zstd_dict": zdict_file,
     "pool_paths": {"/v1/systemone": "kev", "/aff": "aff", "/slow": "slow"},
-    "pool_models": {"combo-r3": "kev-combo"},
+    "pool_models": {"combo-r3": "kev-combo", "zev-h2": "zev-h2"},
     "capture": {"endpoint": f"http://127.0.0.1:{recv.server_address[1]}/events", "check_interval_s": 1, "max_pending": 64},
     "upstreams": [
         # The wedged pod weighs 10x the healthy one: ~90% of first picks if the router believed it.
         up("healthy", "kev"), up("wedged", "kev", 10), up("combo", "kev-combo"),
         up("mm", "default"), up("text", "default", text_only=True),
         up("aff1", "aff"), up("aff2", "aff"), up("slow", "slow"),
+        up("zev", "zev-h2", http2=True),
     ],
 }
 path = tempfile.mktemp(suffix=".json")
@@ -191,6 +208,14 @@ try:
     big_ext = [(h, raw, body) for h, raw, body in ext if len(body) >= 1024]  # under compress_min goes as is
     assert big_ext and all(h.get("content-encoding") == "deflate" and len(raw) < len(body) for h, raw, body in big_ext), "deflated"
     assert all("content-encoding" not in h for h, _, body in ext if len(body) < 1024), "small bodies stay plain"
+    extz = [(h, raw, body) for h, raw, body in seen.get("extz", []) if len(body) >= 1024]
+    assert extz and all(h.get("content-encoding") == "zstd" and h.get("authorization") == "Bearer s3cret"
+                        for h, _, _ in extz), "a +zstd box gets zstd with the dictionary, and its key"
+    zratio = sum(len(b) for _, _, b in extz) / sum(len(r) for _, r, _ in extz)
+    lratio = sum(len(b) for _, _, b in big_ext) / sum(len(r) for _, r, _ in big_ext)
+    assert zratio > lratio, f"zstd + dictionary must beat zlib: {zratio:.1f}x vs {lratio:.1f}x"
+    lan = [h for name in ("mm", "text") for h, _, body in seen.get(name, []) if len(body) >= 1024]
+    assert lan and all("content-encoding" not in h for h in lan), "in-cluster pods are never sent compressed bodies"
     assert all(h.get("authorization") != "Bearer s3cret" for h, _, _ in seen["mm"]), "never leak the key in-cluster"
 
     # 6. Capture: request + response events joined by capture_id for the vLLM pool, nothing for Kev.
@@ -232,9 +257,26 @@ try:
     assert code("/v1/systemone", {"state": "x"}) == 503, "drained: new requests refused"
     assert code("/drain?seconds=0") == 200 and code("/v1/systemone", {"state": "x"}) == 200, "resume reopens"
 
+    # 9. h2c: 200 requests at 50 concurrent ride ONE long-lived TCP connection (HTTP/1.1 would open ~50).
+    from concurrent.futures import ThreadPoolExecutor
+    q = {"model": "zev-h2", "state": "hp toner", "questions": {"k": {"type": "choice", "instructions": "kind",
+                                                                   "criteria": {"good": "a product", "fee": "a fee"}}}}
+    with ThreadPoolExecutor(50) as ex:
+        got = list(ex.map(lambda _: post("/v1/systemone", q), range(200)))
+    assert all(c == 200 and json.loads(b)["version"] == "HTTP/2.0" for c, b in got), got[:2]
+    ss = subprocess.run(["ss", "-tnH", "state", "established", "( dport = :18190 )"], capture_output=True, text=True).stdout
+    conns = len([l for l in ss.splitlines() if l.strip()])
+    assert conns == 1, f"h2c must multiplex over one connection, saw {conns}:\n{ss}"
+    st = {p["name"]: p for p in json.load(urllib.request.urlopen(URL + "/balancer-status"))["pods"]}
+    assert st["zev"]["http2"] and st["zev"]["iterations"] is not None, st["zev"]  # scraped over h2 too
+    print("  h2c: 200 requests at 50 concurrent, all HTTP/2, over 1 TCP connection")
+
     print("smoke ok: 429 retry with a 200 KB body, stall skip, model pool, image routing, rented box key+deflate, "
-          "capture, affinity, drain cut + reopen")
+          "capture, affinity, drain cut + reopen, h2c over one connection")
 finally:
     router.terminate()
+    if zev_proc:
+        zev_proc.terminate()
     os.unlink(path)
     os.unlink(ext_file)
+    os.unlink(zdict_file)

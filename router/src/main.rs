@@ -24,7 +24,7 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use bytes::Bytes;
 use capture::Capture;
-use fleet::{Config, Fleet, Pod};
+use fleet::{Compress, Config, Fleet, Pod};
 use pingora::http::ResponseHeader;
 use pingora::prelude::*;
 use pingora::proxy::{http_proxy_service, ProxyHttp, Session};
@@ -33,8 +33,6 @@ use pingora::services::background::{background_service, BackgroundService};
 
 /// Attempts per request, the first included (florian-nginx: proxy_next_upstream_tries 3).
 const MAX_ATTEMPTS: usize = 3;
-/// A dead node blackholes SYN rather than refusing it; the default would be a long wait before failover starts.
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
 /// Non-streaming replies send nothing until done, so this covers queue + generation, per read.
 const READ_TIMEOUT: Duration = Duration::from_secs(600);
 /// Headers that describe one hop, never forwarded either way.
@@ -53,7 +51,8 @@ const HOP: [&str; 9] = [
 struct Router {
     fleet: Arc<Fleet>,
     capture: Option<Arc<Capture>>,
-    http: reqwest::Client,
+    /// zstd_dict, prepared once: a dictionary is ~110 KB to digest, per request it would cost more than it saves.
+    zdict: Option<Arc<zstd::dict::EncoderDictionary<'static>>>,
 }
 
 /// Why a request ended without an upstream response: the status to answer with.
@@ -105,6 +104,23 @@ fn deflate(body: &[u8], level: u32) -> Option<Vec<u8>> {
     );
     e.write_all(body).ok()?;
     e.finish().ok().filter(|z| z.len() < body.len())
+}
+
+/// A zstd frame (RFC 8878), with the shared dictionary when one is loaded. The frame carries the content size, which
+/// inflate_mw's decompressor needs, and the dictionary id, so a box holding another dictionary refuses it (400).
+fn zstd(
+    body: &[u8],
+    level: i32,
+    dict: Option<&zstd::dict::EncoderDictionary<'static>>,
+) -> Option<Vec<u8>> {
+    let z = match dict {
+        Some(d) => zstd::bulk::Compressor::with_prepared_dictionary(d)
+            .ok()?
+            .compress(body)
+            .ok()?,
+        None => zstd::bulk::compress(body, level).ok()?,
+    };
+    (z.len() < body.len()).then_some(z)
 }
 
 async fn respond(session: &mut Session, code: u16, ctype: &str, body: String) -> Result<()> {
@@ -187,7 +203,7 @@ impl Router {
         );
         let method = reqwest::Method::from_bytes(req.method.as_str().as_bytes())
             .unwrap_or(reqwest::Method::POST);
-        let mut out = self.http.request(method, url);
+        let mut out = self.fleet.client(&pod.up).request(method, url);
         for (k, v) in req.headers.iter() {
             if !HOP.contains(&k.as_str())
                 && !(pod.up.api_key.is_some() && k.as_str() == "authorization")
@@ -199,14 +215,19 @@ impl Router {
             out = out.bearer_auth(key);
         }
         let cfg = &self.fleet.cfg;
-        let squeezed = (pod.up.deflate
-            && cfg.compress_min > 0
+        let worth = cfg.compress_min > 0
             && body.len() >= cfg.compress_min
-            && !req.headers.contains_key("content-encoding"))
-        .then(|| deflate(body, cfg.compress_level))
-        .flatten();
+            && !req.headers.contains_key("content-encoding");
+        let squeezed = match pod.up.compress {
+            _ if !worth => None,
+            Compress::Deflate => deflate(body, cfg.compress_level).map(|z| ("deflate", z)),
+            Compress::Zstd => {
+                zstd(body, cfg.zstd_level, self.zdict.as_deref()).map(|z| ("zstd", z))
+            }
+            Compress::None => None,
+        };
         out = match squeezed {
-            Some(z) => out.header("content-encoding", "deflate").body(z),
+            Some((enc, z)) => out.header("content-encoding", enc).body(z),
             None => out.body(body.clone()), // Bytes: a refcount, not a copy
         };
         // Per wait, like nginx's proxy_read_timeout; a whole-request reqwest timeout would cut long streams.
@@ -410,7 +431,8 @@ impl Router {
                         .unwrap_or_default();
                 for a in addrs {
                     let ok = self
-                        .http
+                        .fleet
+                        .http1()
                         .post(format!("http://{a}/drain?seconds={seconds}&peer=1"))
                         .send()
                         .await
@@ -473,10 +495,6 @@ struct Background {
 #[async_trait]
 impl BackgroundService for Background {
     async fn start(&self, mut shutdown: ShutdownWatch) {
-        let http = reqwest::Client::builder()
-            .timeout(Duration::from_secs(2))
-            .build()
-            .expect("http client");
         let mut tick =
             tokio::time::interval(Duration::from_secs(self.fleet.cfg.metrics_interval_s));
         let check_every = self
@@ -491,7 +509,7 @@ impl BackgroundService for Background {
                 _ = shutdown.changed() => return,
                 _ = tick.tick() => {
                     self.fleet.discover().await;
-                    self.fleet.scrape(&http).await;
+                    self.fleet.scrape().await;
                 }
                 _ = check.tick(), if self.capture.is_some() => self.capture.as_ref().unwrap().check().await,
             }
@@ -512,18 +530,15 @@ fn main() {
         .clone()
         .filter(|c| !c.endpoint.is_empty())
         .map(Capture::new);
-    let http = reqwest::Client::builder()
-        .connect_timeout(CONNECT_TIMEOUT)
-        .pool_max_idle_per_host(64)
-        .build()
-        .expect("http client");
-
     let mut server = Server::new(None).expect("server");
     server.bootstrap();
     let router = Router {
         fleet: fleet.clone(),
         capture: capture.clone(),
-        http,
+        zdict: cfg.zstd_dict.as_ref().map(|p| {
+            let raw = std::fs::read(p).expect("read zstd_dict");
+            Arc::new(zstd::dict::EncoderDictionary::copy(&raw, cfg.zstd_level))
+        }),
     };
     let mut proxy = http_proxy_service(&server.configuration, router);
     proxy.add_tcp(&cfg.listen);
@@ -566,5 +581,32 @@ mod tests {
             .unwrap();
         assert_eq!(back, body, "zlib round trip");
         assert!(deflate(b"x", 1).is_none(), "not worth it: send it as is");
+
+        // zstd, alone and with a dictionary of the shared prompt text: same bytes back, the dictionary much smaller.
+        let samples: Vec<String> = (0..200)
+            .map(|i| format!("{{\"system\":\"You are a browser agent. Use the tools below.\",\"tools\":[\"click\",\"type\",\"scroll\"],\"page\":\"item {i} price {}\"}}", i * 7))
+            .collect();
+        let dict = zstd::dict::from_samples(&samples, 4096).expect("train");
+        let prepared = zstd::dict::EncoderDictionary::copy(&dict, 3);
+        let one = samples[42].repeat(3);
+        let plain = zstd(one.as_bytes(), 3, None).expect("compressible");
+        let with = zstd(one.as_bytes(), 3, Some(&prepared)).expect("compressible");
+        assert!(
+            with.len() < plain.len(),
+            "the dictionary must pay: {} vs {}",
+            with.len(),
+            plain.len()
+        );
+        let mut d = zstd::bulk::Decompressor::with_dictionary(&dict).unwrap();
+        assert_eq!(
+            d.decompress(&with, 1 << 20).unwrap(),
+            one.as_bytes(),
+            "zstd + dictionary round trip"
+        );
+        assert_eq!(
+            zstd::bulk::decompress(&plain, 1 << 20).unwrap(),
+            one.as_bytes(),
+            "zstd round trip"
+        );
     }
 }
