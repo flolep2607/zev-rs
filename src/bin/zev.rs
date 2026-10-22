@@ -115,6 +115,7 @@ enum Commands {
         /// Serve a model on the Candle backend: a checkpoint dir or a Hub id[@revision] (repeat to serve several; the
         /// request's `model` picks one, the first is the default). The family (Kev, decider, JevK5) is detected. Kev
         /// adapters on the same base share one copy of it (LoRAs unmerged); the request's `model` is the spec as given.
+        /// `NAME=SPEC` also serves it as NAME, its first name: the label in /metrics and /health, stable across versions.
         #[cfg(feature = "candle")]
         #[arg(long = "model")]
         models: Vec<String>,

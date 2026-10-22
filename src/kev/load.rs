@@ -320,6 +320,25 @@ fn kev_served(
 /// minus the merged one's (`Model::with_adapter`), exact. N adapters cost one base plus N-1 small (A, B) sets against N
 /// merged backbones. List the busiest adapter first.
 pub fn load_all(specs: &[String], o: &LoadOpts) -> Res<Vec<Served>> {
+    let (names, specs): (Vec<Option<&str>>, Vec<&str>) = specs.iter().map(|s| split_name(s)).unzip();
+    let mut out = load_specs(&specs, o)?;
+    for (m, n) in out.iter_mut().zip(names) {
+        if let Some(n) = n {
+            m.names.insert(0, n.to_string());
+        }
+    }
+    Ok(out)
+}
+
+/// `NAME=SPEC` -> (Some(NAME), SPEC). A NAME holds no '/', so a path or hub id containing '=' stays a plain spec.
+fn split_name(s: &str) -> (Option<&str>, &str) {
+    match s.split_once('=') {
+        Some((n, spec)) if !n.is_empty() && !n.contains('/') => (Some(n), spec),
+        _ => (None, s),
+    }
+}
+
+fn load_specs(specs: &[&str], o: &LoadOpts) -> Res<Vec<Served>> {
     let dirs: Vec<PathBuf> = specs.iter().map(|s| resolve(s)).collect::<Res<_>>()?;
     let bases: Vec<Option<(String, PathBuf)>> = dirs.iter().map(|d| kev_base(d)).collect::<Res<_>>()?;
     let shared = |b: &Path| bases.iter().flatten().filter(|(_, x)| x == b).count() > 1;
@@ -406,4 +425,18 @@ pub fn load_kev(kev: &Path, base: &Path, head: &Path, o: &LoadOpts) -> Res<Serve
         o.serve.clone(),
         card,
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_name;
+
+    #[test]
+    fn split_name_takes_a_slashless_prefix_only() {
+        assert_eq!(split_name("kev-combo=/root/.cache/kev-combo-r8"), (Some("kev-combo"), "/root/.cache/kev-combo-r8"));
+        assert_eq!(split_name("kev-4b=org/kev-4b@abc"), (Some("kev-4b"), "org/kev-4b@abc"));
+        assert_eq!(split_name("/root/a=b"), (None, "/root/a=b"));
+        assert_eq!(split_name("org/kev-4b@abc"), (None, "org/kev-4b@abc"));
+        assert_eq!(split_name("=x"), (None, "=x"));
+    }
 }

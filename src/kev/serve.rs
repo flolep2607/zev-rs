@@ -574,8 +574,8 @@ async fn list_models(State(s): State<AppState>) -> Json<Value> {
     Json(json!({ "models": cards }))
 }
 
-/// /metrics in the Prometheus text format, one series per served model, labelled by its last name: the load spec,
-/// unique per pod. The first name is often a shared alias (kev-latest), and two models under one label collide.
+/// /metrics in the Prometheus text format, one series per served model, labelled by its first name. Two models whose
+/// first name is the same alias (kev-latest) collide: name them with `--model NAME=SPEC`.
 async fn metrics(
     State(s): State<AppState>,
 ) -> ([(axum::http::HeaderName, &'static str); 1], String) {
@@ -591,7 +591,7 @@ async fn metrics(
     let label = |m: &Served| {
         format!(
             "model=\"{}\"",
-            m.names.last().map_or("", |n| n.as_str()).replace('"', "")
+            m.names.first().map_or("", |n| n.as_str()).replace('"', "")
         )
     };
     counter(
