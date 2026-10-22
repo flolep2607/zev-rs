@@ -56,7 +56,7 @@ thiserror = "2.0"
 clap = { version = "4.5", features = ["derive"] }
 tokio = { version = "1.40", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"] }
-axum = { version = "0.8", optional = true }
+axum = { version = "0.8", optional = true, features = ["http2"] }
 apfel = { package = "apfel-rs", version = "0.1", optional = true }
 smallvec = "1.14"
 candle-core = { version = "0.11", optional = true }
