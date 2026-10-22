@@ -16,9 +16,13 @@ screenshot prompt).
 1. **Drained?** 503 (`/drain` below).
 2. **Read the body**, bounded by `max_body_bytes` (413 past it). Every retry replays it; it is dropped as soon as the
    response headers arrive, so a long stream does not hold its prompt.
-3. **Pool**: `pool_paths[path]`, else `default`; then `pool_models[body.model]` overrides it. A request and all its
-   retries stay in their pool. kev-combo, which answers every model name with its own adapter, gets its own pool on
-   the same `/v1/systemone` path this way.
+3. **Pool and model**: `pool_paths[path]`, else `default`; a static `pool_models[body.model]` overrides it. Then
+   discovery: if the body's `model` is a name some pod lists on `/v1/models` (a base model, a LoRA adapter, a zev
+   model name), the request goes **only to pods listing it**, whatever their pool. That is the LoRA affinity, and it
+   finds kev-combo by its model name with no `pool_models`. A name listed within the last hour whose pods are all gone
+   is a **503 naming the model, at once**: zev answers any name with its own adapter, so falling back would return
+   another model's answer. A name never listed (e.g. `kev-4b`, served by zev under its own names) keeps the path's
+   pool. A request and its retries stay among the pods chosen here.
 4. **Image check**, only for a pool with a `text_only` pod: a `"type": "image_url"` content part keeps the request off
    text-only pods (a bare `image_url` in a prompt or schema does not).
 5. **Admission**. With the `affinity_header` (default `x-session-id`), the session's **home** pod (weighted rendezvous
@@ -30,8 +34,9 @@ screenshot prompt).
    the pool: 502 at once.
 6. **Attempts**, up to 3: a connect error, no headers within 600 s, or a **429/500/502/503** goes to an untried pod,
    and the pod is scored down for 30 s. With no untried pod left, the last answer is passed through.
-   Per attempt, for a **rented box only**: the body compressed when it is at least `compress_min` (zstd with the
-   shared `zstd_dict` for a box marked `zstd`, else zlib for `deflate`), and its `Authorization: Bearer <api_key>`.
+   Per attempt, for a **rented box only**: the body compressed when it is at least `compress_min` (zstd for a box
+   marked `zstd`, with `zstd_dict` once the box reports holding it and uncompressed until then; zlib for `deflate`),
+   and its `Authorization: Bearer <api_key>`.
    An in-cluster pod is never sent a compressed body or that key: `compress` cannot even be set on a configured
    upstream, because on the LAN compression is CPU spent for nothing.
 7. **Stream back**, cut at once by `/drain` (dropping the upstream connection is what makes vLLM abort the
@@ -53,10 +58,16 @@ prompts, dictionary trained on the older three quarters and measured on the newe
 share whole pages. **Across days it is ~6.8x** (dictionary from the 19 and 24 Aug captures, measured on the newest
 quarter of 24 Aug; a 19 Aug dictionary alone gets 8.0x on all of 24 Aug), ~2.5x fewer bytes than zlib. Retrain the
 dictionary as prompts drift.
-`vast/train_zstd_dict.py` trains it from a capture; the same file is `zstd_dict` here and is baked next to
-`inflate_mw.py` in the box image, and vast-holo marks such a box `+zstd`. A frame names its dictionary id, so a box
-with another dictionary answers 400 rather than misreading the prompt. The dictionary holds the prompts' most
-frequent substrings: keep it out of git and out of public images.
+`vast/train_zstd_dict.py` trains it from captures (~80 s for 4,454 prompts); it is committed as
+`vast/prompts.zdict` (the prompts are product names and public page text).
+
+**Rolling it out needs no image and no restart.** The router re-reads `zstd_dict` (mount it from a plain ConfigMap)
+whenever the file changes; a file that is not a trained dictionary is refused and the old one stays. On every scrape
+of a `zstd` box it GETs the box's `/zstd-dict` (inflate_mw), and on a mismatch PUTs its dictionary with the box's API
+key, then reads the id again. It compresses for that box with zstd only once the box reports our id; until then the
+body goes uncompressed, so a mismatch, a refused key or an old image costs bandwidth, never a request. The box keeps
+its previous two dictionaries: a frame names its dictionary id, so a body compressed just before a swap still
+decodes, and one made with an unknown dictionary is a 400, never wrong text. vast-holo marks such a box `+zstd`.
 
 ## In the background, every `metrics_interval_s`
 
@@ -66,13 +77,20 @@ Resolve each upstream (`dns` = a headless Service, `addrs` = fixed backends) and
 `num_requests_running/waiting`, `kv_cache_usage_perc`, `iteration_tokens_total_count`, and zev's `zev_in_flight` +
 `zev_passes_total` (summed over a pod's models). A step counter frozen for `stall_s` while work is queued is a
 **wedged engine**, skipped outright. A failed scrape scores the pod down and keeps its last sample.
+Then `/v1/models` (vLLM: base model, loaded LoRA adapters with their `parent`, `max_model_len`; zev: the names it
+serves), once per pod `/openapi.json` to see whether vLLM allows runtime LoRA loading (`/v1/load_lora_adapter`;
+noted, not used), and for a `zstd` box the dictionary sync above. Image capability, compression and http2 are not
+discoverable: they come from config (`text_only`, the Secret's marks, `http2`) and are shown next to the
+discovered facts.
 
 ## Endpoints of the router itself
 
 - `/ready`
-- `/balancer-status`: JSON per pod (pool, held/cap, score, load, stalled, failing, external, ...) and `drained_s`.
-- `/metrics`: `zev_router_pod_{held,cap,score,load,stalled,failing}`, `zev_router_responses_total{pool,status}`,
-  `zev_router_drained`, `zev_router_capture_dropped_total`.
+- `/balancer-status`: JSON per pod (pool, held/cap, score, load, stalled, failing; discovered `models`, `lora_runtime`,
+  `box_dict`; configured `text_only`, `compress`, `http2`, `external`), the router's `zstd_dict` id and `drained_s`.
+- `/metrics`: `zev_router_pod_{held,cap,score,load,stalled,failing}`, `zev_router_pod_model{model,parent,max_len}`
+  (one series per model or adapter a pod lists), `zev_router_pod_box_dict`, `zev_router_zstd_dict_id`,
+  `zev_router_responses_total{pool,status}`, `zev_router_drained`, `zev_router_capture_dropped_total`.
 - `/drain[?seconds=N]`: close admission for N s (default `drain_seconds`, 0 reopens) and cut every request in flight,
   on every replica: with `peers_dns` it fans out to each one with `&peer=1`. Refused (403) with an
   `X-Forwarded-For`, i.e. through an ingress. A TTL: a drain nobody lifts expires.
@@ -90,7 +108,7 @@ or past `max_pending` events in flight, nothing is captured. Delivery is one sho
 {
   "listen": "0.0.0.0:8000", "replicas": 2, "threads": 4,
   "pool_paths": { "/v1/systemone": "kev" },
-  "pool_models": { "combo-r3-w8b": "kev-combo" },
+  "pool_models": {},
   "zstd_dict": "/etc/zev-router/prompts.zdict",
   "peers_dns": "argo-workflow-zev-router-peers.argo.svc.cluster.local",
   "external_file": "/etc/zev-router/external/endpoints.json",

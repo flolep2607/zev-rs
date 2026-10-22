@@ -24,7 +24,7 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use bytes::Bytes;
 use capture::Capture;
-use fleet::{Compress, Config, Fleet, Pod};
+use fleet::{Compress, Config, Fleet, Pod, Want};
 use pingora::http::ResponseHeader;
 use pingora::prelude::*;
 use pingora::proxy::{http_proxy_service, ProxyHttp, Session};
@@ -51,12 +51,10 @@ const HOP: [&str; 9] = [
 struct Router {
     fleet: Arc<Fleet>,
     capture: Option<Arc<Capture>>,
-    /// zstd_dict, prepared once: a dictionary is ~110 KB to digest, per request it would cost more than it saves.
-    zdict: Option<Arc<zstd::dict::EncoderDictionary<'static>>>,
 }
 
 /// Why a request ended without an upstream response: the status to answer with.
-struct Reject(u16, &'static str);
+struct Reject(u16, String);
 
 /// Does this body carry an image? The content part's type tag, not the bare word: prompts and JSON schemas say
 /// `image_url` as plain text, and each of those 502'd once only the text-only 5090 was left (2026-10-20).
@@ -135,9 +133,8 @@ impl Router {
     /// A slot on the session's home, else on any pod; waits for releases while every pod is full.
     async fn admit(
         &self,
-        pool: &str,
+        want: &Want<'_>,
         sid: Option<&str>,
-        needs_image: bool,
     ) -> std::result::Result<Arc<Pod>, Reject> {
         let f = &self.fleet;
         let start = Instant::now();
@@ -150,30 +147,35 @@ impl Router {
             tokio::pin!(freed);
             freed.as_mut().enable();
             if f.drained() {
-                return Err(Reject(503, "drained"));
+                return Err(Reject(503, "drained".into()));
             }
-            let home = sid.and_then(|s| f.home(pool, s, needs_image));
+            let home = sid.and_then(|s| f.home(want, s));
             if let Some(h) = &home {
                 if f.take(h) {
                     return Ok(h.clone());
                 }
             }
             // Holding out for the home's prefix: only while affinity_wait_s lasts and no sibling is clearly idler.
-            let hold = home.as_ref().is_some_and(|h| {
-                Instant::now() < affinity_until && !f.crowded(h, pool, needs_image)
-            });
+            let hold = home
+                .as_ref()
+                .is_some_and(|h| Instant::now() < affinity_until && !f.crowded(h, want));
             if !hold {
-                let (pod, known) = f.reserve(pool, &none, needs_image);
+                let (pod, known) = f.reserve(want, &none);
                 if let Some(p) = pod {
                     return Ok(p);
                 }
                 if known == 0 {
-                    return Err(Reject(502, "no pods discovered in this pool"));
+                    // A model some pod listed within the hour: fail fast, never fall back to a pod that would answer
+                    // with another adapter (zev answers any name with its own).
+                    return Err(match want.model {
+                        Some(m) => Reject(503, format!("no pod currently serves model {m}")),
+                        None => Reject(502, format!("no pods discovered in pool {}", want.pool)),
+                    });
                 }
             }
             let now = Instant::now();
             if now >= deadline {
-                return Err(Reject(503, "queue timeout: every pod at cap"));
+                return Err(Reject(503, "queue timeout: every pod at cap".into()));
             }
             // Releases and scrapes wake this; the 1 s bound re-checks pods going stale or coming back.
             let _ = tokio::time::timeout((deadline - now).min(Duration::from_secs(1)), freed).await;
@@ -221,9 +223,14 @@ impl Router {
         let squeezed = match pod.up.compress {
             _ if !worth => None,
             Compress::Deflate => deflate(body, cfg.compress_level).map(|z| ("deflate", z)),
-            Compress::Zstd => {
-                zstd(body, cfg.zstd_level, self.zdict.as_deref()).map(|z| ("zstd", z))
-            }
+            // With a dictionary configured, only once the box reports holding it; until then the body goes as is:
+            // a dictionary mismatch costs bandwidth, never a request.
+            Compress::Zstd => match self.fleet.box_ready(pod) {
+                Ok(d) => {
+                    zstd(body, cfg.zstd_level, d.as_ref().map(|d| &d.enc)).map(|z| ("zstd", z))
+                }
+                Err(()) => None,
+            },
             Compress::None => None,
         };
         out = match squeezed {
@@ -266,12 +273,23 @@ impl Router {
 
         let path = session.req_header().uri.path().to_string();
         let mut pool = f.pool_for(&path).to_string();
-        if !f.cfg.pool_models.is_empty() {
-            if let Some(p) = model_of(b).and_then(|m| f.cfg.pool_models.get(&m).cloned()) {
-                pool = p;
-            }
+        let model = model_of(b);
+        // Static pool_models first (zev pods that all list the same names), then discovery: a model or LoRA adapter
+        // some pod lists pins the request to those pods.
+        if let Some(p) = model
+            .as_ref()
+            .and_then(|m| f.cfg.pool_models.get(m).cloned())
+        {
+            pool = p;
         }
-        let needs_image = f.has_text_only(&pool) && carries_image(b);
+        let pinned = model.as_deref().filter(|m| f.model_known(m));
+        let mut want = Want {
+            pool: &pool,
+            model: pinned,
+            needs_image: false,
+        };
+        want.needs_image = f.has_text_only(&want) && carries_image(b);
+        let want = want;
         let headers = &session.req_header().headers;
         let sid = headers
             .get(f.cfg.affinity_header.as_str())
@@ -295,7 +313,7 @@ impl Router {
                 )
             });
 
-        let mut pod = match self.admit(&pool, sid.as_deref(), needs_image).await {
+        let mut pod = match self.admit(&want, sid.as_deref()).await {
             Ok(p) => p,
             Err(Reject(code, why)) => {
                 f.count(&pool, code);
@@ -317,7 +335,7 @@ impl Router {
             // A zev pod answers 429 when its queue is full, and a wedged one answers nothing else: 1.04M of them in
             // 16 h on 2026-10-21 while it looked like the idlest pod. Fast to get, so the next pod costs ~nothing.
             let next = (tried.len() < MAX_ATTEMPTS)
-                .then(|| f.reserve(&pool, &tried, needs_image).0)
+                .then(|| f.reserve(&want, &tried).0)
                 .flatten();
             match next {
                 Some(n) => {
@@ -508,6 +526,7 @@ impl BackgroundService for Background {
             tokio::select! {
                 _ = shutdown.changed() => return,
                 _ = tick.tick() => {
+                    self.fleet.reload_zdict();
                     self.fleet.discover().await;
                     self.fleet.scrape().await;
                 }
@@ -535,10 +554,6 @@ fn main() {
     let router = Router {
         fleet: fleet.clone(),
         capture: capture.clone(),
-        zdict: cfg.zstd_dict.as_ref().map(|p| {
-            let raw = std::fs::read(p).expect("read zstd_dict");
-            Arc::new(zstd::dict::EncoderDictionary::copy(&raw, cfg.zstd_level))
-        }),
     };
     let mut proxy = http_proxy_service(&server.configuration, router);
     proxy.add_tcp(&cfg.listen);

@@ -301,6 +301,48 @@ pub fn external_upstreams(json: &str, default_cap: usize) -> Vec<Upstream> {
         .collect()
 }
 
+/// One entry of a pod's /v1/models. vLLM lists its base model and every loaded LoRA adapter (with `parent`, the
+/// base it applies to) and `max_model_len`; zev lists the names it serves.
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
+pub struct ModelInfo {
+    pub id: String,
+    pub parent: Option<String>,
+    pub max_len: Option<u64>,
+}
+
+/// Either dialect of /v1/models: OpenAI's `{"data":[{"id","parent","max_model_len"}]}` (vLLM) or zev's
+/// `{"models":[{"name"}]}`. None when it is neither, so a pod that does not answer keeps its last list.
+pub fn parse_models(json: &str) -> Option<Vec<ModelInfo>> {
+    let v: serde_json::Value = serde_json::from_str(json).ok()?;
+    let s = |e: &serde_json::Value, k: &str| e.get(k).and_then(|x| x.as_str()).map(str::to_string);
+    if let Some(data) = v.get("data").and_then(|d| d.as_array()) {
+        return Some(
+            data.iter()
+                .filter_map(|e| {
+                    Some(ModelInfo {
+                        id: s(e, "id")?,
+                        parent: s(e, "parent"),
+                        max_len: e.get("max_model_len").and_then(|x| x.as_u64()),
+                    })
+                })
+                .collect(),
+        );
+    }
+    let models = v.get("models")?.as_array()?;
+    Some(
+        models
+            .iter()
+            .filter_map(|e| {
+                Some(ModelInfo {
+                    id: s(e, "name")?,
+                    parent: None,
+                    max_len: None,
+                })
+            })
+            .collect(),
+    )
+}
+
 #[derive(Debug)]
 pub struct State {
     pub sample: Sample,
@@ -310,6 +352,12 @@ pub struct State {
     pub failing_until: Option<Instant>,
     /// Requests this replica has dispatched to the pod and not yet released.
     pub held: usize,
+    /// From the pod's /v1/models; kept across a failed fetch.
+    pub models: Vec<ModelInfo>,
+    /// vLLM with VLLM_ALLOW_RUNTIME_LORA_UPDATING exposes /v1/load_lora_adapter; checked once per pod.
+    pub lora_runtime: Option<bool>,
+    /// The zstd dictionary id a rented box reports holding (its /zstd-dict); zstd is sent only when it is ours.
+    pub box_dict: Option<u32>,
 }
 
 #[derive(Debug)]
@@ -325,6 +373,9 @@ const STALE_PENALTY_AFTER: Duration = Duration::from_secs(15);
 const FAIL_FOR: Duration = Duration::from_secs(30);
 const FAIL_PENALTY: f64 = 0.05; // soft, not a skip: a fleet-wide blip must not empty the list
 const KV_CLIFF: f64 = 0.95;
+/// How long a model name stays "known" after the last pod listing it went away: a request for it then fails fast
+/// instead of falling back to a pod that would answer with another adapter (zev answers any name with its own).
+const MODEL_MEMORY: Duration = Duration::from_secs(3600);
 
 impl Pod {
     pub fn new(addr: SocketAddr, up: Arc<Upstream>, replicas: usize) -> Self {
@@ -335,6 +386,9 @@ impl Pod {
             stalled_since: None,
             failing_until: None,
             held: 0,
+            models: Vec::new(),
+            lora_runtime: None,
+            box_dict: None,
         };
         Pod {
             addr,
@@ -391,6 +445,23 @@ impl Pod {
     }
 }
 
+/// What a request can go to. With `model` set (a name some pod lists, or listed within the last hour), only pods
+/// listing it, whatever their pool: that is how a LoRA adapter or kev-combo's model finds its pods. Without it,
+/// the path's pool as before.
+#[derive(Clone, Copy, Debug)]
+pub struct Want<'a> {
+    pub pool: &'a str,
+    pub model: Option<&'a str>,
+    pub needs_image: bool,
+}
+
+/// The router's zstd dictionary, as read from `zstd_dict`.
+pub struct ZDict {
+    pub id: u32,
+    pub raw: bytes::Bytes,
+    pub enc: zstd::dict::EncoderDictionary<'static>,
+}
+
 pub struct Fleet {
     pub cfg: Config,
     pub pods: RwLock<Vec<Arc<Pod>>>,
@@ -408,6 +479,11 @@ pub struct Fleet {
     /// h2c: one connection per pod, multiplexing every request, kept for good and pinged every 10 s so a peer that
     /// vanished (node NotReady, SYN blackholed) is noticed before a request is sent into it.
     h2: reqwest::Client,
+    /// Every model name a pod has listed, and when last: see MODEL_MEMORY.
+    seen_models: Mutex<HashMap<String, Instant>>,
+    /// zstd_dict, re-read when its file changes: retraining is a ConfigMap update, nothing restarts.
+    zdict: RwLock<Option<Arc<ZDict>>>,
+    zdict_stamp: Mutex<Option<(std::time::SystemTime, u64)>>,
 }
 
 /// A dead node blackholes SYN rather than refusing it; the default would be a long wait before failover starts.
@@ -433,7 +509,7 @@ impl Fleet {
             .pool_idle_timeout(None)
             .build()
             .expect("h2c client");
-        Fleet {
+        let f = Fleet {
             cfg,
             pods: RwLock::new(Vec::new()),
             freed: Notify::new(),
@@ -442,7 +518,12 @@ impl Fleet {
             cut: watch::channel(0).0,
             h1,
             h2,
-        }
+            seen_models: Mutex::new(HashMap::new()),
+            zdict: RwLock::new(None),
+            zdict_stamp: Mutex::new(None),
+        };
+        f.reload_zdict();
+        f
     }
 
     /// For plain HTTP/1.1 calls of the router's own (the /drain fan-out to its peers).
@@ -470,13 +551,66 @@ impl Fleet {
             .map_or("default", String::as_str)
     }
 
-    /// Only a pool with a text-only member needs its bodies scanned for images.
-    pub fn has_text_only(&self, pool: &str) -> bool {
+    pub fn zdict(&self) -> Option<Arc<ZDict>> {
+        self.zdict.read().unwrap().clone()
+    }
+
+    /// (Re)load zstd_dict when its file changed. A missing or unreadable file keeps the dictionary in use; one that
+    /// is not a trained dictionary is refused with an error, also keeping the old one.
+    pub fn reload_zdict(&self) {
+        let Some(path) = &self.cfg.zstd_dict else {
+            return;
+        };
+        let stamp = std::fs::metadata(path)
+            .ok()
+            .map(|m| (m.modified().unwrap_or(std::time::UNIX_EPOCH), m.len()));
+        if stamp.is_none() || *self.zdict_stamp.lock().unwrap() == stamp {
+            return;
+        }
+        *self.zdict_stamp.lock().unwrap() = stamp;
+        let Ok(raw) = std::fs::read(path) else { return };
+        let Some(id) = zstd::zstd_safe::get_dict_id_from_dict(&raw) else {
+            log::error!("{path} is not a trained zstd dictionary (no dictionary id); keeping the one in use");
+            return;
+        };
+        let enc = zstd::dict::EncoderDictionary::copy(&raw, self.cfg.zstd_level);
+        log::warn!(
+            "zstd dictionary {} loaded from {path} ({} bytes)",
+            id.get(),
+            raw.len()
+        );
+        *self.zdict.write().unwrap() = Some(Arc::new(ZDict {
+            id: id.get(),
+            raw: raw.into(),
+            enc,
+        }));
+    }
+
+    /// Does `model` pin the request to the pods that list it? Yes when a pod lists it now or did within the last
+    /// hour. A name never listed (e.g. "kev-4b", which zev serves under its own names) keeps the path's pool.
+    pub fn model_known(&self, model: &str) -> bool {
+        self.seen_models
+            .lock()
+            .unwrap()
+            .get(model)
+            .is_some_and(|t| t.elapsed() < MODEL_MEMORY)
+    }
+
+    fn eligible(p: &Pod, st: &State, w: &Want) -> bool {
+        let fits = match w.model {
+            Some(m) => st.models.iter().any(|x| x.id == m),
+            None => p.up.pool == w.pool,
+        };
+        fits && !(w.needs_image && p.up.text_only)
+    }
+
+    /// Only a request that could reach a text-only pod needs its body scanned for images.
+    pub fn has_text_only(&self, w: &Want) -> bool {
         self.pods
             .read()
             .unwrap()
             .iter()
-            .any(|p| p.up.pool == pool && p.up.text_only)
+            .any(|p| p.up.text_only && Self::eligible(p, &p.state.lock().unwrap(), w))
     }
 
     pub fn drained(&self) -> bool {
@@ -518,29 +652,23 @@ impl Fleet {
             .or_default() += 1;
     }
 
-    fn eligible(p: &Pod, pool: &str, needs_image: bool) -> bool {
-        p.up.pool == pool && !(needs_image && p.up.text_only)
-    }
-
-    /// Weighted-random pick among the pool's pods with a free slot, taking the slot. `known` counts the pool's pods
-    /// at all, so the caller can tell "all full" (wait) from "none discovered" (fail now).
-    pub fn reserve(
-        &self,
-        pool: &str,
-        tried: &HashSet<SocketAddr>,
-        needs_image: bool,
-    ) -> (Option<Arc<Pod>>, usize) {
+    /// Weighted-random pick among the eligible pods with a free slot, taking the slot. `known` counts the eligible
+    /// pods at all, so the caller can tell "all full" (wait) from "none" (fail now).
+    pub fn reserve(&self, w: &Want, tried: &HashSet<SocketAddr>) -> (Option<Arc<Pod>>, usize) {
         let now = Instant::now();
         let stall = self.stall();
         let pods = self.pods.read().unwrap();
         let mut known = 0;
         let mut cands: Vec<(f64, &Arc<Pod>)> = Vec::new();
-        for p in pods.iter().filter(|p| Self::eligible(p, pool, needs_image)) {
+        for p in pods.iter() {
+            let st = p.state.lock().unwrap();
+            if !Self::eligible(p, &st, w) {
+                continue;
+            }
             known += 1;
             if tried.contains(&p.addr) {
                 continue;
             }
-            let st = p.state.lock().unwrap();
             let score = p.score(&st, now, stall);
             if score > 0.0 && st.held < p.cap {
                 cands.push((score, p));
@@ -563,15 +691,15 @@ impl Fleet {
 
     /// Weighted rendezvous hash: every replica agrees on a session's home with no shared state, and losing a pod
     /// rehomes only its own sessions. Failing or stalled pods are skipped.
-    pub fn home(&self, pool: &str, session: &str, needs_image: bool) -> Option<Arc<Pod>> {
+    pub fn home(&self, w: &Want, session: &str) -> Option<Arc<Pod>> {
         let now = Instant::now();
         let stall = self.stall();
         let pods = self.pods.read().unwrap();
         pods.iter()
-            .filter(|p| Self::eligible(p, pool, needs_image))
             .filter(|p| {
                 let st = p.state.lock().unwrap();
-                st.last_seen.is_some()
+                Self::eligible(p, &st, w)
+                    && st.last_seen.is_some()
                     && !Pod::stalled(&st, now, stall)
                     && !st.failing_until.is_some_and(|t| now < t)
             })
@@ -586,7 +714,7 @@ impl Fleet {
     /// Stop waiting for a full home now? Yes once another pod with a free slot scores `ratio` times the home:
     /// rendezvous hashing balances session count, not weight, and a few heavy sessions pinned pods at cap while a
     /// third of the slots sat idle (florian-nginx, 2026-08-11).
-    pub fn crowded(&self, home: &Pod, pool: &str, needs_image: bool) -> bool {
+    pub fn crowded(&self, home: &Pod, w: &Want) -> bool {
         let ratio = self.cfg.spill_ratio;
         if ratio <= 0.0 {
             return false;
@@ -601,10 +729,12 @@ impl Fleet {
             .read()
             .unwrap()
             .iter()
-            .filter(|p| p.addr != home.addr && Self::eligible(p, pool, needs_image))
+            .filter(|p| p.addr != home.addr)
             .any(|p| {
                 let st = p.state.lock().unwrap();
-                st.held < p.cap && p.score(&st, now, stall) >= ratio * home_score
+                Self::eligible(p, &st, w)
+                    && st.held < p.cap
+                    && p.score(&st, now, stall) >= ratio * home_score
             })
     }
 
@@ -656,34 +786,47 @@ impl Fleet {
         *pods = found
             .into_iter()
             .map(|(a, up)| match old.get(&a) {
-                Some(p) if p.up.name == up.name && p.up.api_key == up.api_key => p.clone(),
+                Some(p)
+                    if p.up.name == up.name
+                        && p.up.api_key == up.api_key
+                        && p.up.compress == up.compress =>
+                {
+                    p.clone()
+                }
                 _ => Arc::new(Pod::new(a, up, self.cfg.replicas)),
             })
             .collect();
     }
 
-    /// One scrape of every pod's /metrics. A failed scrape marks the pod failing and keeps its last sample: zeros
-    /// would score a hung pod as idle, the most attractive backend there is.
-    pub async fn scrape(&self) {
+    /// One scrape of every pod: /metrics (load, stall), /v1/models (what it serves), once its runtime-LoRA
+    /// capability, and for a rented zstd box its dictionary, pushed when it is not ours. A failed /metrics marks the
+    /// pod failing and keeps its last sample: zeros would score a hung pod as idle, the most attractive backend.
+    pub async fn scrape(self: &Arc<Self>) {
         let pods: Vec<Arc<Pod>> = self.pods.read().unwrap().clone();
         let stall = self.stall();
         let mut set = tokio::task::JoinSet::new();
         for p in pods {
-            // Over the pod's own connection: on h2 the scrape rides the request stream's connection, and a scrape
-            // that fails is also news about that connection.
-            let http = self.client(&p.up).clone();
+            let f = self.clone();
             set.spawn(async move {
-                let mut req = http
-                    .get(format!("http://{}/metrics", p.addr))
-                    .timeout(Duration::from_secs(2));
-                if let Some(key) = &p.up.api_key {
-                    req = req.bearer_auth(key);
-                }
-                let body = match req.send().await {
-                    Ok(r) if r.status().is_success() => r.text().await.ok(),
-                    _ => None,
+                // Over the pod's own connection: on h2 the scrape rides the request stream's connection, and a
+                // scrape that fails is also news about that connection.
+                let http = f.client(&p.up).clone();
+                let get = |path: &str| {
+                    let mut req = http
+                        .get(format!("http://{}{path}", p.addr))
+                        .timeout(Duration::from_secs(2));
+                    if let Some(key) = &p.up.api_key {
+                        req = req.bearer_auth(key);
+                    }
+                    req.send()
                 };
-                match body {
+                let text = |r: reqwest::Result<reqwest::Response>| async move {
+                    match r {
+                        Ok(r) if r.status().is_success() => r.text().await.ok(),
+                        _ => None,
+                    }
+                };
+                match text(get("/metrics").await).await {
                     Some(b) => {
                         p.record(parse_metrics(&b), Instant::now());
                         let st = p.state.lock().unwrap();
@@ -698,12 +841,99 @@ impl Fleet {
                     None => {
                         log::warn!("metrics fetch failed for {} ({})", p.addr, p.up.name);
                         p.fail();
+                        return;
                     }
+                }
+                if let Some(models) = text(get("/v1/models").await)
+                    .await
+                    .as_deref()
+                    .and_then(parse_models)
+                {
+                    {
+                        let now = Instant::now();
+                        let mut seen = f.seen_models.lock().unwrap();
+                        for m in &models {
+                            seen.insert(m.id.clone(), now);
+                        }
+                    }
+                    let vllm = models.iter().any(|m| m.max_len.is_some());
+                    let ask_lora = vllm && p.state.lock().unwrap().lora_runtime.is_none();
+                    p.state.lock().unwrap().models = models;
+                    if ask_lora {
+                        // ponytail: openapi.json is read once per pod to see whether runtime LoRA loading is on;
+                        // on-demand loading itself is not implemented.
+                        let api = text(get("/openapi.json").await).await;
+                        p.state.lock().unwrap().lora_runtime =
+                            api.map(|a| a.contains("/v1/load_lora_adapter"));
+                    }
+                }
+                if p.up.compress == Compress::Zstd {
+                    f.sync_dict(&p).await;
                 }
             });
         }
         while set.join_next().await.is_some() {}
         self.freed.notify_waiters();
+    }
+
+    /// Make a rented box hold our dictionary: read its id, PUT ours on a mismatch, read again. Only the id the box
+    /// reports is recorded, so a failed or refused push (wrong key, old image) leaves it uncompressed, never broken.
+    async fn sync_dict(&self, p: &Pod) {
+        let http = self.client(&p.up);
+        let url = format!("http://{}/zstd-dict", p.addr);
+        let held = || async {
+            let mut req = http.get(&url).timeout(Duration::from_secs(2));
+            if let Some(key) = &p.up.api_key {
+                req = req.bearer_auth(key);
+            }
+            let r = req.send().await.ok().filter(|r| r.status().is_success())?;
+            r.json::<serde_json::Value>()
+                .await
+                .ok()?
+                .get("dict_id")?
+                .as_u64()
+                .map(|i| i as u32)
+        };
+        let mut id = held().await;
+        if let Some(d) = self.zdict().filter(|d| id != Some(d.id)) {
+            let mut put = http
+                .put(&url)
+                .body(d.raw.clone())
+                .timeout(Duration::from_secs(10));
+            if let Some(key) = &p.up.api_key {
+                put = put.bearer_auth(key);
+            }
+            match put.send().await {
+                Ok(r) if r.status().is_success() => {
+                    id = held().await;
+                    log::warn!(
+                        "pushed zstd dictionary {} to {} ({}): box now holds {id:?}",
+                        d.id,
+                        p.addr,
+                        p.up.name
+                    );
+                }
+                Ok(r) => log::warn!(
+                    "{} ({}) refused zstd dictionary {}: {}",
+                    p.addr,
+                    p.up.name,
+                    d.id,
+                    r.status()
+                ),
+                Err(e) => log::warn!("pushing zstd dictionary to {} failed: {e}", p.addr),
+            }
+        }
+        p.state.lock().unwrap().box_dict = id;
+    }
+
+    /// The dictionary to compress for this box with, if it holds ours. None with a dictionary configured means: send
+    /// it uncompressed until the box confirms; with none configured, plain zstd.
+    pub fn box_ready(&self, p: &Pod) -> Result<Option<Arc<ZDict>>, ()> {
+        match self.zdict() {
+            None => Ok(None),
+            Some(d) if p.state.lock().unwrap().box_dict == Some(d.id) => Ok(Some(d)),
+            Some(_) => Err(()),
+        }
     }
 
     pub fn status_json(&self) -> String {
@@ -722,17 +952,24 @@ impl Fleet {
                     "running": st.sample.running, "waiting": st.sample.waiting, "kv_cache": st.sample.kv_cache,
                     "iterations": st.sample.iterations, "stalled": Pod::stalled(&st, now, stall),
                     "failing": st.failing_until.is_some_and(|t| now < t),
+                    // discovered
+                    "models": st.models, "lora_runtime": st.lora_runtime, "box_dict": st.box_dict,
+                    // configured: not discoverable from vLLM
                     "text_only": p.up.text_only, "compress": format!("{:?}", p.up.compress).to_lowercase(),
-                    "http2": p.up.http2,
-                    "external": p.up.api_key.is_some(),
+                    "http2": p.up.http2, "external": p.up.api_key.is_some(),
                     "seconds_since_scrape": st.last_seen.map(|t| now.duration_since(t).as_secs_f64()),
                 })
             })
             .collect();
-        serde_json::json!({ "drained_s": self.drain_remaining_s(), "pods": pods }).to_string()
+        serde_json::json!({
+            "drained_s": self.drain_remaining_s(),
+            "zstd_dict": self.zdict().map(|d| d.id),
+            "pods": pods,
+        })
+        .to_string()
     }
 
-    /// Per-pod gauges labelled by pool and upstream, plus responses by pool and status class.
+    /// Per-pod gauges labelled by pool and upstream, the models each pod serves, plus responses by pool and status.
     pub fn prometheus(&self) -> String {
         use std::fmt::Write;
         let now = Instant::now();
@@ -784,6 +1021,34 @@ impl Fleet {
                 );
             }
         }
+        let _ = writeln!(out, "# HELP zev_router_pod_model 1 per model or LoRA adapter the pod lists on /v1/models (parent = base model of an adapter)\n# TYPE zev_router_pod_model gauge");
+        for p in pods.iter() {
+            let st = p.state.lock().unwrap();
+            for m in &st.models {
+                let esc = |s: &str| s.replace('\\', "\\\\").replace('"', "\\\"");
+                let _ = writeln!(
+                    out,
+                    "zev_router_pod_model{{pool=\"{}\",upstream=\"{}\",pod=\"{}\",model=\"{}\",parent=\"{}\",max_len=\"{}\"}} 1",
+                    p.up.pool, p.up.name, p.addr, esc(&m.id), esc(m.parent.as_deref().unwrap_or("")),
+                    m.max_len.map_or(String::new(), |l| l.to_string())
+                );
+            }
+        }
+        let _ = writeln!(out, "# HELP zev_router_pod_box_dict zstd dictionary id a rented box reports holding (0 = none)\n# TYPE zev_router_pod_box_dict gauge");
+        for p in pods.iter().filter(|p| p.up.compress == Compress::Zstd) {
+            let id = p.state.lock().unwrap().box_dict.unwrap_or(0);
+            let _ = writeln!(
+                out,
+                "zev_router_pod_box_dict{{pool=\"{}\",upstream=\"{}\",pod=\"{}\"}} {id}",
+                p.up.pool, p.up.name, p.addr
+            );
+        }
+        let _ = writeln!(out, "# HELP zev_router_zstd_dict_id the dictionary id this router compresses with (0 = none)\n# TYPE zev_router_zstd_dict_id gauge");
+        let _ = writeln!(
+            out,
+            "zev_router_zstd_dict_id {}",
+            self.zdict().map_or(0, |d| d.id)
+        );
         let _ = writeln!(out, "# HELP zev_router_drained 1 while /drain holds admission closed\n# TYPE zev_router_drained gauge");
         let _ = writeln!(out, "zev_router_drained {}", self.drained() as u8);
         let _ = writeln!(out, "# HELP zev_router_responses_total responses by pool and status class\n# TYPE zev_router_responses_total counter");
@@ -925,29 +1190,68 @@ mod tests {
         ]);
         let none = HashSet::new();
         for _ in 0..2 {
-            let (p, known) = f.reserve("kev", &none, false);
+            let (p, known) = f.reserve(
+                &Want {
+                    pool: "kev",
+                    model: None,
+                    needs_image: false,
+                },
+                &none,
+            );
             assert_eq!(
                 (p.unwrap().addr.port(), known),
                 (8008, 1),
                 "a kev request sees only kev pods"
             );
         }
-        let (p, known) = f.reserve("kev", &none, false);
+        let (p, known) = f.reserve(
+            &Want {
+                pool: "kev",
+                model: None,
+                needs_image: false,
+            },
+            &none,
+        );
         assert!(
             p.is_none() && known == 1,
             "full is not empty: wait, don't 502"
         );
-        let (_, known) = f.reserve("nope", &none, false);
+        let (_, known) = f.reserve(
+            &Want {
+                pool: "nope",
+                model: None,
+                needs_image: false,
+            },
+            &none,
+        );
         assert_eq!(known, 0, "no pod of the pool: fail fast");
         let kev = f.pods.read().unwrap()[1].clone();
         f.release(&kev);
         assert!(
-            f.reserve("kev", &none, false).0.is_some(),
+            f.reserve(
+                &Want {
+                    pool: "kev",
+                    model: None,
+                    needs_image: false
+                },
+                &none
+            )
+            .0
+            .is_some(),
             "a released slot is reusable"
         );
         let tried: HashSet<_> = [kev.addr].into();
         assert!(
-            f.reserve("kev", &tried, false).0.is_none(),
+            f.reserve(
+                &Want {
+                    pool: "kev",
+                    model: None,
+                    needs_image: false
+                },
+                &tried
+            )
+            .0
+            .is_none(),
             "a retry never goes back to a tried pod"
         );
 
@@ -981,25 +1285,59 @@ mod tests {
             ("10.0.0.1:8000", up("mm", "default", 10.0, 4), 0.0),
             ("10.0.0.2:8000", Arc::new(text), 0.0),
         ]);
-        assert!(f.has_text_only("default") && !f.has_text_only("kev"));
+        assert!(
+            f.has_text_only(&Want {
+                pool: "default",
+                model: None,
+                needs_image: false
+            }) && !f.has_text_only(&Want {
+                pool: "kev",
+                model: None,
+                needs_image: false
+            })
+        );
         for _ in 0..4 {
             assert_eq!(
-                f.reserve("default", &HashSet::new(), true)
-                    .0
-                    .unwrap()
-                    .up
-                    .name,
+                f.reserve(
+                    &Want {
+                        pool: "default",
+                        model: None,
+                        needs_image: true
+                    },
+                    &HashSet::new()
+                )
+                .0
+                .unwrap()
+                .up
+                .name,
                 "mm"
             );
         }
-        let (p, known) = f.reserve("default", &HashSet::new(), true);
+        let (p, known) = f.reserve(
+            &Want {
+                pool: "default",
+                model: None,
+                needs_image: true,
+            },
+            &HashSet::new(),
+        );
         assert!(
             p.is_none() && known == 1,
             "text-only pods are not even known to an image request"
         );
         for i in 0..20 {
             assert_eq!(
-                f.home("default", &format!("s{i}"), true).unwrap().up.name,
+                f.home(
+                    &Want {
+                        pool: "default",
+                        model: None,
+                        needs_image: true
+                    },
+                    &format!("s{i}")
+                )
+                .unwrap()
+                .up
+                .name,
                 "mm"
             );
         }
@@ -1011,14 +1349,39 @@ mod tests {
             ("10.0.0.1:8000", up("a", "default", 10.0, 8), 0.0),
             ("10.0.0.2:8000", up("a", "default", 10.0, 8), 0.0),
         ]);
-        let h1 = f.home("default", "sess-1", false).unwrap();
+        let h1 = f
+            .home(
+                &Want {
+                    pool: "default",
+                    model: None,
+                    needs_image: false,
+                },
+                "sess-1",
+            )
+            .unwrap();
         assert_eq!(
-            f.home("default", "sess-1", false).unwrap().addr,
+            f.home(
+                &Want {
+                    pool: "default",
+                    model: None,
+                    needs_image: false
+                },
+                "sess-1"
+            )
+            .unwrap()
+            .addr,
             h1.addr,
             "same session, same pod"
         );
         assert!(
-            !f.crowded(&h1, "default", false),
+            !f.crowded(
+                &h1,
+                &Want {
+                    pool: "default",
+                    model: None,
+                    needs_image: false
+                }
+            ),
             "equal pods: hold the prefix"
         );
         h1.record(
@@ -1029,12 +1392,28 @@ mod tests {
             Instant::now(),
         );
         assert!(
-            f.crowded(&h1, "default", false),
+            f.crowded(
+                &h1,
+                &Want {
+                    pool: "default",
+                    model: None,
+                    needs_image: false
+                }
+            ),
             "a jammed home spills to a clearly idler sibling"
         );
         h1.fail();
         assert_ne!(
-            f.home("default", "sess-1", false).unwrap().addr,
+            f.home(
+                &Want {
+                    pool: "default",
+                    model: None,
+                    needs_image: false
+                },
+                "sess-1"
+            )
+            .unwrap()
+            .addr,
             h1.addr,
             "a failing home rehomes"
         );
@@ -1088,5 +1467,145 @@ mod tests {
             !f.drained() && !cut.has_changed().unwrap(),
             "resume reopens without cutting anything"
         );
+    }
+
+    #[test]
+    fn parses_both_models_dialects() {
+        let vllm = r#"{"object":"list","data":[
+            {"id":"holo","max_model_len":32768,"parent":null},
+            {"id":"lora-a","max_model_len":32768,"parent":"holo"}]}"#;
+        let m = parse_models(vllm).unwrap();
+        assert_eq!(
+            m[1],
+            ModelInfo {
+                id: "lora-a".into(),
+                parent: Some("holo".into()),
+                max_len: Some(32768)
+            }
+        );
+        let zev = r#"{"models":[{"name":"kev-latest","kind":"kev"},{"name":"jev-latest"}]}"#;
+        let ids: Vec<_> = parse_models(zev)
+            .unwrap()
+            .into_iter()
+            .map(|m| m.id)
+            .collect();
+        assert_eq!(ids, ["kev-latest", "jev-latest"]);
+        assert!(
+            parse_models("zev_in_flight 3").is_none(),
+            "not /v1/models: keep the last list"
+        );
+    }
+
+    #[test]
+    fn a_listed_model_pins_the_request_to_its_pods() {
+        let f = fleet(vec![
+            ("10.0.0.1:8000", up("base", "default", 10.0, 8), 0.0),
+            ("10.0.0.2:8000", up("lora", "default", 10.0, 8), 0.0),
+            ("10.0.0.3:8008", up("combo", "kev-combo", 10.0, 8), 0.0),
+        ]);
+        let set = |i: usize, ids: &[&str]| {
+            let p = f.pods.read().unwrap()[i].clone();
+            p.state.lock().unwrap().models = ids
+                .iter()
+                .map(|id| ModelInfo {
+                    id: id.to_string(),
+                    parent: None,
+                    max_len: None,
+                })
+                .collect();
+            let now = Instant::now();
+            for id in ids {
+                f.seen_models.lock().unwrap().insert(id.to_string(), now);
+            }
+        };
+        set(0, &["holo"]);
+        set(1, &["holo", "lora-a"]);
+        set(2, &["combo-r3"]);
+        let none = HashSet::new();
+        for _ in 0..8 {
+            let w = Want {
+                pool: "default",
+                model: Some("lora-a"),
+                needs_image: false,
+            };
+            assert_eq!(
+                f.reserve(&w, &none).0.unwrap().up.name,
+                "lora",
+                "an adapter goes only where it is loaded"
+            );
+        }
+        // Across pools: kev-combo's model found from /v1/systemone's pool, no pool_models needed.
+        let w = Want {
+            pool: "kev",
+            model: Some("combo-r3"),
+            needs_image: false,
+        };
+        assert_eq!(f.reserve(&w, &none).0.unwrap().up.name, "combo");
+        assert!(
+            f.model_known("combo-r3") && !f.model_known("kev-4b"),
+            "a name never listed keeps the path's pool"
+        );
+        // Its pod goes away: the name is still known for an hour, so the request finds no pod (fail fast)
+        // instead of falling back to one that would answer with another adapter.
+        f.pods.write().unwrap().pop();
+        let (p, known) = f.reserve(&w, &none);
+        assert!(p.is_none() && known == 0 && f.model_known("combo-r3"));
+        f.seen_models
+            .lock()
+            .unwrap()
+            .insert("combo-r3".into(), Instant::now() - MODEL_MEMORY);
+        assert!(!f.model_known("combo-r3"), "forgotten after an hour");
+    }
+
+    #[test]
+    fn zstd_waits_for_the_box_to_hold_our_dictionary() {
+        let dir = std::env::temp_dir().join(format!("zev-router-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("d.zdict");
+        let train = |w: &str| {
+            let samples: Vec<String> = (0..300)
+                .map(|i| format!("{{\"page\":\"{w} {i}\",\"tools\":[\"click\",\"type\"]}}"))
+                .collect();
+            zstd::dict::from_samples(&samples, 4096).unwrap()
+        };
+        let mut cfg: Config = serde_json::from_str(r#"{"listen":"0:0","upstreams":[]}"#).unwrap();
+        let p = Pod::new(
+            "1.1.1.1:1".parse().unwrap(),
+            up("box", "default", 1.0, 4),
+            1,
+        );
+        let f = Fleet::new(cfg.clone());
+        assert!(
+            matches!(f.box_ready(&p), Ok(None)),
+            "no dictionary configured: plain zstd"
+        );
+
+        std::fs::write(&path, train("a")).unwrap();
+        cfg.zstd_dict = Some(path.to_string_lossy().into());
+        let f = Fleet::new(cfg);
+        let a = f.zdict().unwrap().id;
+        assert!(
+            f.box_ready(&p).is_err(),
+            "the box has not confirmed: send uncompressed"
+        );
+        p.state.lock().unwrap().box_dict = Some(a);
+        assert_eq!(f.box_ready(&p).unwrap().unwrap().id, a);
+
+        // Retrained: the file changes, the router reloads it, and the box (still on a) goes back to uncompressed.
+        std::thread::sleep(Duration::from_millis(20));
+        std::fs::write(&path, train("b")).unwrap();
+        f.reload_zdict();
+        let b = f.zdict().unwrap().id;
+        assert_ne!(a, b);
+        assert!(
+            f.box_ready(&p).is_err(),
+            "a box on the old dictionary is sent nothing compressed with the new"
+        );
+        // Not a dictionary: refused, the one in use stays.
+        std::thread::sleep(Duration::from_millis(20));
+        std::fs::write(&path, b"just some bytes, no magic").unwrap();
+        f.reload_zdict();
+        assert_eq!(f.zdict().unwrap().id, b);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
