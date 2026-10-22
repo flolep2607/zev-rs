@@ -141,6 +141,10 @@ pub struct Config {
     pub zstd_dict: Option<String>,
     #[serde(default = "mib100")]
     pub max_body_bytes: usize,
+    /// Retrain `zstd_dict` from the bodies sent to zstd boxes (train.rs). Needs `zstd_dict`: that file is where every
+    /// replica picks the published dictionary up.
+    #[serde(default)]
+    pub autotrain: Option<crate::train::AutoTrainCfg>,
 }
 
 fn one() -> usize {
@@ -484,6 +488,7 @@ pub struct Fleet {
     /// zstd_dict, re-read when its file changes: retraining is a ConfigMap update, nothing restarts.
     zdict: RwLock<Option<Arc<ZDict>>>,
     zdict_stamp: Mutex<Option<(std::time::SystemTime, u64)>>,
+    pub train: Option<Arc<crate::train::Trainer>>,
 }
 
 /// A dead node blackholes SYN rather than refusing it; the default would be a long wait before failover starts.
@@ -509,6 +514,13 @@ impl Fleet {
             .pool_idle_timeout(None)
             .build()
             .expect("h2c client");
+        let train = cfg.autotrain.clone().map(|t| {
+            let path = cfg
+                .zstd_dict
+                .clone()
+                .expect("autotrain needs zstd_dict: where the dictionary is published");
+            Arc::new(crate::train::Trainer::new(t, cfg.zstd_level, path))
+        });
         let f = Fleet {
             cfg,
             pods: RwLock::new(Vec::new()),
@@ -521,6 +533,7 @@ impl Fleet {
             seen_models: Mutex::new(HashMap::new()),
             zdict: RwLock::new(None),
             zdict_stamp: Mutex::new(None),
+            train,
         };
         f.reload_zdict();
         f
@@ -964,6 +977,7 @@ impl Fleet {
         serde_json::json!({
             "drained_s": self.drain_remaining_s(),
             "zstd_dict": self.zdict().map(|d| d.id),
+            "autotrain": self.train.as_ref().map(|t| t.status()),
             "pods": pods,
         })
         .to_string()
@@ -1049,6 +1063,9 @@ impl Fleet {
             "zev_router_zstd_dict_id {}",
             self.zdict().map_or(0, |d| d.id)
         );
+        if let Some(t) = &self.train {
+            t.prometheus(&mut out);
+        }
         let _ = writeln!(out, "# HELP zev_router_drained 1 while /drain holds admission closed\n# TYPE zev_router_drained gauge");
         let _ = writeln!(out, "zev_router_drained {}", self.drained() as u8);
         let _ = writeln!(out, "# HELP zev_router_responses_total responses by pool and status class\n# TYPE zev_router_responses_total counter");

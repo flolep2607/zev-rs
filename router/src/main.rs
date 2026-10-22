@@ -14,6 +14,7 @@
 
 mod capture;
 mod fleet;
+mod train;
 
 use std::collections::HashSet;
 use std::io::Write as _;
@@ -225,12 +226,21 @@ impl Router {
             Compress::Deflate => deflate(body, cfg.compress_level).map(|z| ("deflate", z)),
             // With a dictionary configured, only once the box reports holding it; until then the body goes as is:
             // a dictionary mismatch costs bandwidth, never a request.
-            Compress::Zstd => match self.fleet.box_ready(pod) {
-                Ok(d) => {
-                    zstd(body, cfg.zstd_level, d.as_ref().map(|d| &d.enc)).map(|z| ("zstd", z))
+            Compress::Zstd => {
+                let train = self.fleet.train.as_ref();
+                if let Some(t) = train {
+                    t.sample(body);
                 }
-                Err(()) => None,
-            },
+                match self.fleet.box_ready(pod) {
+                    Ok(d) => zstd(body, cfg.zstd_level, d.as_ref().map(|d| &d.enc)).inspect(|z| {
+                        if let Some(t) = train {
+                            t.sent(d.as_ref().map_or(0, |d| d.id), body.len(), z.len());
+                        }
+                    }),
+                    Err(()) => None,
+                }
+                .map(|z| ("zstd", z))
+            }
             Compress::None => None,
         };
         out = match squeezed {
@@ -529,6 +539,9 @@ impl BackgroundService for Background {
                     self.fleet.reload_zdict();
                     self.fleet.discover().await;
                     self.fleet.scrape().await;
+                    if let Some(t) = &self.fleet.train {
+                        t.tick(self.fleet.zdict().map(|d| d.raw.clone())).await;
+                    }
                 }
                 _ = check.tick(), if self.capture.is_some() => self.capture.as_ref().unwrap().check().await,
             }

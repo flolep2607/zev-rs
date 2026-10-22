@@ -69,6 +69,51 @@ body goes uncompressed, so a mismatch, a refused key or an old image costs bandw
 its previous two dictionaries: a frame names its dictionary id, so a body compressed just before a swap still
 decodes, and one made with an unknown dictionary is a 400, never wrong text. vast-holo marks such a box `+zstd`.
 
+### Retraining it, in the router (`autotrain`)
+
+Each replica keeps the most recent bodies it sends to `zstd` boxes, up to `max_samples` (2,000) and `max_bytes`
+(130 MiB). They are refcounts on request buffers, not copies, and bodies over 1 MiB (screenshots) are skipped. It is a
+ring, not a reservoir, because the dictionary should fit the newest traffic and the held-out quarter is the newest. It
+also keeps a byte-weighted **live ratio** over roughly the last 500 bodies it sent, per dictionary id.
+
+A training is due when there are at least `min_samples` (500) bodies, at least `min_interval_s` (1 h) has passed since
+the last one, and one of these holds:
+
+- **NoBaseline**: there is no measured ratio for the dictionary in use, because the router just started or just
+  became leader.
+- **Age**: `every_s` (24 h) has passed since the last training.
+- **Drift**: the live ratio fell below `drift` (0.8) × the baseline.
+
+It runs on a thread of its own at nice 19, with the zstd crate's trainer (`dict_bytes` 110,000, as in
+`train_zstd_dict.py`). It trains on the older three quarters, then measures the candidate and the dictionary in use on
+the newest quarter. With no dictionary loaded, it measures against plain zstd. The candidate is published only if it
+is `margin` (3%) better. Either way the measured ratio becomes the new baseline. Both ratios and the verdict are
+logged and shown.
+
+**One replica trains.** A Kubernetes Lease (`lease`, default `zev-router-zdict`, `lease_s` 30) elects it, renewed every
+tick. Expiry is judged as client-go does: a Lease whose record has not changed for `lease_s` by our own clock, so no
+two clocks are compared. The leader writes the dictionary as `binaryData[key]` of the ConfigMap `configmap`. Every
+replica mounts that ConfigMap as the directory holding `zstd_dict`, so the kubelet refreshes the file (within about a
+minute) and the existing reload and box sync take it from there. If the API cannot be reached, nobody leads and the
+dictionary in use stays. With neither `api` nor `KUBERNETES_SERVICE_HOST`, the router leads alone and writes
+`zstd_dict` itself.
+
+Mount the whole ConfigMap as a directory, **not with `subPath`**: a subPath mount is never refreshed. The router needs:
+
+```yaml
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata: { name: zev-router-zdict }
+rules:
+  - { apiGroups: [coordination.k8s.io], resources: [leases], resourceNames: [zev-router-zdict], verbs: [get, update] }
+  - { apiGroups: [""], resources: [configmaps], resourceNames: [zev-router-zdict], verbs: [get, update] }
+  # create cannot be limited by name; drop these two once the Lease and ConfigMap exist
+  - { apiGroups: [coordination.k8s.io], resources: [leases], verbs: [create] }
+  - { apiGroups: [""], resources: [configmaps], verbs: [create] }
+```
+
+Bound to the router's ServiceAccount with a RoleBinding. The identity is `HOSTNAME`, i.e. the pod name.
+
 ## In the background, every `metrics_interval_s`
 
 Resolve each upstream (`dns` = a headless Service, `addrs` = fixed backends) and the rented boxes in `external_file`
@@ -87,10 +132,12 @@ discovered facts.
 
 - `/ready`
 - `/balancer-status`: JSON per pod (pool, held/cap, score, load, stalled, failing; discovered `models`, `lora_runtime`,
-  `box_dict`; configured `text_only`, `compress`, `http2`, `external`), the router's `zstd_dict` id and `drained_s`.
+  `box_dict`; configured `text_only`, `compress`, `http2`, `external`), the router's `zstd_dict` id, `drained_s`, and
+  `autotrain` (leader, samples, live and baseline ratios, trainings, last reason/result/ratios/time).
 - `/metrics`: `zev_router_pod_{held,cap,score,load,stalled,failing}`, `zev_router_pod_model{model,parent,max_len}`
   (one series per model or adapter a pod lists), `zev_router_pod_box_dict`, `zev_router_zstd_dict_id`,
-  `zev_router_responses_total{pool,status}`, `zev_router_drained`, `zev_router_capture_dropped_total`.
+  `zev_router_responses_total{pool,status}`, `zev_router_drained`, `zev_router_capture_dropped_total`, and with
+  `autotrain` `zev_router_zdict_{leader,samples,live_ratio,baseline_ratio,trainings,last_training_timestamp_seconds}`.
 - `/drain[?seconds=N]`: close admission for N s (default `drain_seconds`, 0 reopens) and cut every request in flight,
   on every replica: with `peers_dns` it fans out to each one with `&peer=1`. Refused (403) with an
   `X-Forwarded-For`, i.e. through an ingress. A TTL: a drain nobody lifts expires.
@@ -109,7 +156,8 @@ or past `max_pending` events in flight, nothing is captured. Delivery is one sho
   "listen": "0.0.0.0:8000", "replicas": 2, "threads": 4,
   "pool_paths": { "/v1/systemone": "kev" },
   "pool_models": {},
-  "zstd_dict": "/etc/zev-router/prompts.zdict",
+  "zstd_dict": "/etc/zev-router/zdict/prompts.zdict",
+  "autotrain": {},
   "peers_dns": "argo-workflow-zev-router-peers.argo.svc.cluster.local",
   "external_file": "/etc/zev-router/external/endpoints.json",
   "capture": { "endpoint": "http://172.17.16.214:9009/events" },
@@ -128,7 +176,10 @@ or past `max_pending` events in flight, nothing is captured. Delivery is one sho
 replica under-admits, the safe direction). Defaults: `metrics_interval_s` 5, `stall_s` 30, `queue_timeout_s` 180,
 `affinity_wait_s` 20, `spill_ratio` 3, `drain_seconds` 300, `peers_port` 8000, `external_max_inflight` 40,
 `compress_min` 4096, `compress_level` 1 (zlib), `zstd_level` 3, `max_body_bytes` 100 MiB; capture: `check_interval_s` 30,
-`max_request_bytes` 25 MiB, `max_response_bytes` 2 MiB, `max_pending` 2, `timeout_ms` 500.
+`max_request_bytes` 25 MiB, `max_response_bytes` 2 MiB, `max_pending` 2, `timeout_ms` 500; autotrain: `every_s` 86400,
+`min_interval_s` 3600, `drift` 0.8, `margin` 0.03, `min_samples` 500, `max_samples` 2000, `max_bytes` 130 MiB,
+`dict_bytes` 110000, `lease`/`configmap` `zev-router-zdict`, `key` `prompts.zdict`, `lease_s` 30, `namespace` the pod's,
+`api` in-cluster.
 
 ## Against florian-nginx
 
@@ -153,5 +204,13 @@ temp file instead); vLLM pods stay on HTTP/1.1 keep-alive (uvicorn has no HTTP/2
                       # in-cluster pods never compressed, h2c: 200 requests at 50 concurrent over one TCP
                       # connection to a zev-like pod. Needs `cargo build --example fake_h2c_pod` and the
                       # zstandard Python package.
+    python3 smoke_train.py  # two replicas, a stub Kubernetes API, a real inflate_mw box: only the Lease holder
+                            # trains, publishes to the ConfigMap, both replicas and the box take the dictionary, a
+                            # retrain on the same traffic is rejected, the other replica takes over the Lease when
+                            # the leader is killed.
+
+To exercise the Lease for real, run two replicas with `autotrain` in a namespace that has the Role above.
+`kubectl get lease zev-router-zdict -o yaml` shows the holder. Delete the holder pod: the other replica takes over
+within `lease_s`. For a quick end-to-end run, set `min_samples: 50, every_s: 600`.
 
 Live, 2026-10-21: 200 real `/v1/systemone` calls through the router to the Kev NodePorts in 2.8 s, all 2xx.

@@ -14,9 +14,13 @@ async-trait = "0.1"
 # <1.54: tokio 1.54 asserts a non-zero BufStream capacity, and pingora 0.9 builds every accepted TCP stream with
 # capacity 0, so the proxy thread panics on its first connection. Lift once pingora sizes its buffers.
 tokio = { version = ">=1.40, <1.54", features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
-# json: capture events; http2: h2c to pods that speak it. No default features: no TLS (cluster-internal and rented boxes are plain HTTP) and no
-# response decompression, so bodies pass through byte for byte.
-reqwest = { version = "0.12", default-features = false, features = ["json", "http2"] }
+# json: capture events; http2: h2c to pods that speak it; rustls with manual roots: the Kubernetes API (Lease, ConfigMap)
+# only, trusting the service account's CA. Pods and rented boxes are plain HTTP. No default features: no response
+# decompression, so bodies pass through byte for byte.
+reqwest = { version = "0.12", default-features = false, features = ["json", "http2", "rustls-tls-manual-roots"] }
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+libc = "0.2"
 bytes = "1"
 flate2 = "1"
 # zstd + a trained dictionary for rented boxes: ~6.8x on a later day's prompts against zlib 1's 2.7x.
