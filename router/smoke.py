@@ -27,6 +27,7 @@ INFLATE_MW = os.environ.get("INFLATE_MW", "/data/vllm/vast/inflate_mw.py")
 seen = {}  # pod name -> list of (headers, raw body, decoded body)
 wedged = {"in_flight": 0}  # 0 at first: a frozen counter is not a stall until work queues
 stream_closed = threading.Event()
+inflate_delay = [0.0]  # the "inflate" pod's answer time, raised mid-test
 events = []
 # What each fake lists on /v1/models: (dialect, names). Mutable, so a pod can stop listing a model mid-test.
 models = {"combo": ("zev", ["combo-r3"]), "mm": ("vllm", ["holo"]), "text": ("vllm", ["holo"]),
@@ -60,6 +61,11 @@ def fake(name, mode="ok"):
                 return self.reply(200, json.dumps({"object": "list", "data": data}).encode())
             if mode == "wedged":
                 m = f'zev_in_flight{{model="kev"}} {wedged["in_flight"]}\nzev_passes_total{{model="kev"}} 19\n'
+            elif mode in ("quick", "lag"):  # busy every scrape; quick serves 4x the tokens per GPU-busy second
+                passes[0] += 1
+                tok = passes[0] * 0.5 * (4000 if mode == "quick" else 1000)
+                m = (f'zev_in_flight{{model="kev"}} 1\nzev_passes_total{{model="kev"}} {passes[0]}\n'
+                     f'zev_pass_tokens_total{{model="kev"}} {tok}\nzev_pass_duration_seconds_sum{{model="kev"}} {passes[0] * 0.5}\n')
             else:
                 passes[0] += 1
                 m = f'zev_in_flight{{model="kev"}} 0\nzev_passes_total{{model="kev"}} {passes[0]}\n'
@@ -70,6 +76,8 @@ def fake(name, mode="ok"):
             enc = self.headers.get("content-encoding")
             body = zlib.decompress(raw) if enc == "deflate" else raw
             seen.setdefault(name, []).append(({k.lower(): v for k, v in self.headers.items()}, raw, body))
+            if mode == "inflate":
+                time.sleep(inflate_delay[0])
             if mode == "wedged":
                 return self.reply(429, b'{"detail":"inference queue saturated"}')
             if mode == "slow":  # an SSE generation that a drain must cut
@@ -183,7 +191,8 @@ threading.Thread(target=recv.serve_forever, daemon=True).start()
 
 pods = {n: fake(n, m) for n, m in [("healthy", "ok"), ("wedged", "wedged"), ("combo", "ok"), ("mm", "ok"),
                                    ("text", "ok"), ("ext", "ok"), ("aff1", "ok"), ("aff2", "ok"), ("slow", "slow"),
-                                   ("lora", "ok"), ("fading", "ok")]}
+                                   ("lora", "ok"), ("fading", "ok"), ("quick", "quick"), ("lag", "lag"),
+                                   ("inflate", "inflate")]}
 # A zev-like pod on axum's serve (HTTP/1.1 + h2c), built next to the router by `cargo build --example fake_h2c_pod`.
 H2C_BIN = os.path.join(os.path.dirname(BIN), "examples", "fake_h2c_pod")
 zev_proc = subprocess.Popen([H2C_BIN, "18190"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -214,7 +223,7 @@ def up(name, pool, mult=1, **kw):
 cfg = {
     "listen": "127.0.0.1:18089", "metrics_interval_s": 1, "stall_s": 2, "queue_timeout_s": 5,
     "affinity_wait_s": 2, "compress_min": 1024, "external_file": ext_file, "zstd_dict": zdict_file,
-    "pool_paths": {"/v1/systemone": "kev", "/aff": "aff", "/slow": "slow"},
+    "pool_paths": {"/v1/systemone": "kev", "/aff": "aff", "/slow": "slow", "/learn": "learn", "/infl": "infl"},
     "pool_models": {"zev-h2": "zev-h2"},  # combo-r3 is found through /v1/models instead
     "capture": {"endpoint": f"http://127.0.0.1:{recv.server_address[1]}/events", "check_interval_s": 1, "max_pending": 64},
     "upstreams": [
@@ -223,6 +232,7 @@ cfg = {
         up("mm", "default"), up("text", "default", text_only=True), up("lora", "lora-pool"), up("fading", "fade-pool"),
         up("aff1", "aff"), up("aff2", "aff"), up("slow", "slow"),
         up("zev", "zev-h2", http2=True),
+        up("quick", "learn", 10), up("lag", "learn", 10), up("inflate", "infl"),
     ],
 }
 path = tempfile.mktemp(suffix=".json")
@@ -443,8 +453,27 @@ try:
     assert st["zev"]["http2"] and st["zev"]["iterations"] is not None, st["zev"]  # scraped over h2 too
     print("  h2c: 200 requests at 50 concurrent, all HTTP/2, over 1 TCP connection")
 
+    # 13. Learned weights: same gpu_multiplier, but "quick" serves 4x the tokens per busy second, so it gets ~4x the
+    #     traffic. An inflating pod's adaptive limit is cut below its cap.
+    _, st = status()
+    assert abs(st["quick"]["weight"] - 16) < 1 and abs(st["lag"]["weight"] - 4) < 1, (st["quick"]["weight"], st["lag"]["weight"])
+    got = [json.loads(post("/learn", {"state": "s"})[1])["pod"] for _ in range(300)]
+    share = got.count("quick") / len(got)
+    assert 0.7 < share < 0.9, share
+    for _ in range(100):
+        post("/infl", {"state": "s"})
+    base = status()[1]["inflate"]
+    assert base["limit"] == base["cap"] == 64, base
+    inflate_delay[0] = 0.15
+    for _ in range(25):
+        post("/infl", {"state": "s"})
+    after = status()[1]["inflate"]
+    assert after["limit"] < 32 and after["room"] < 32, after
+    print(f"  learned weights: quick {st['quick']['weight']:.1f} / lag {st['lag']['weight']:.1f} (both seeded 10) -> {share:.0%} "
+          f"of traffic to quick; inflating pod's limit 64 -> {after['limit']:.1f} (baseline {after['latency_baseline_s'] * 1000:.0f} ms)")
+
     print("smoke ok: 429 retry with a 200 KB body, stall skip, model pins, image routing, rented box key+deflate, "
-          "dictionary sync + swap, capture, affinity, drain cut + reopen, h2c over one connection")
+          "dictionary sync + swap, capture, affinity, drain cut + reopen, h2c over one connection, learned weights, adaptive limit")
 finally:
     router.terminate()
     zev_proc.terminate()

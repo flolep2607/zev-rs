@@ -6,7 +6,7 @@ box running the real vast/inflate_mw.py.
 
 Checks: only the Lease holder trains; its first dictionary beats plain zstd, goes to the ConfigMap, both replicas
 load it and the box is pushed it; a later training on the same traffic is rejected as not better; when the leader
-dies the other replica takes the Lease over.
+dies the other replica takes the Lease over; each pod's node and GPU come from the API.
 """
 
 import base64
@@ -78,6 +78,10 @@ class Api(BaseHTTPRequestHandler):
         self.store(self.path, o)
 
 
+# Where the pods run: every fake is on 127.0.0.1, here a pod on a 4090 node.
+objs["/api/v1/namespaces/t/pods?fieldSelector=status.phase%3DRunning"] = {
+    "items": [{"status": {"podIP": "127.0.0.1"}, "spec": {"nodeName": "gpuworker-t"}}]}
+objs["/api/v1/nodes/gpuworker-t"] = {"metadata": {"labels": {"nvidia.com/gpu.product": "NVIDIA-GeForce-RTX-4090"}}}
 api = ThreadingHTTPServer(("127.0.0.1", 0), Api)
 threading.Thread(target=api.serve_forever, daemon=True).start()
 
@@ -130,8 +134,8 @@ json.dump({"api_key": "s3cret", "endpoints": [{"name": "zbox", "ip": "127.0.0.1"
 routers, PORTS = {}, {"r1": 18389, "r2": 18390}
 for name, port in PORTS.items():
     cfg = {"listen": f"127.0.0.1:{port}", "metrics_interval_s": 1, "compress_min": 1024, "external_file": ext,
-           "zstd_dict": DICT_FILE, "upstreams": [],
-           "autotrain": {"api": f"http://127.0.0.1:{api.server_address[1]}", "namespace": "t", "min_samples": 60,
+           "zstd_dict": DICT_FILE, "upstreams": [], "kube_api": f"http://127.0.0.1:{api.server_address[1]}", "kube_namespace": "t",
+           "autotrain": {"min_samples": 60,
                          "max_samples": 400, "every_s": 6, "min_interval_s": 3, "margin": 0.1, "dict_bytes": 16384, "lease_s": 4}}
     path = os.path.join(tmp, f"{name}.json")
     json.dump(cfg, open(path, "w"))
@@ -208,6 +212,8 @@ try:
     until(lambda: status(other)["autotrain"]["leader"], f"{other} to take the Lease over", timeout=15)
     print(f"  {leader} stopped: {other} took the Lease over")
     assert all(c == 200 for c in codes), codes
+    pod = status(other)["pods"][0]
+    assert pod["node"] == "gpuworker-t" and pod["gpu"] == "NVIDIA-GeForce-RTX-4090", pod
     metrics = urllib.request.urlopen(f"http://127.0.0.1:{PORTS[other]}/metrics").read().decode()
     assert "zev_router_zdict_leader 1" in metrics and "zev_router_zdict_live_ratio" in metrics
     print(f"smoke_train ok: {len(codes)} requests, 0 failed")

@@ -3,7 +3,7 @@
 //! instead of nginx shared dicts, and waiting on a Notify instead of a 50 ms poll.
 
 use std::collections::{HashMap, HashSet};
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
@@ -145,6 +145,16 @@ pub struct Config {
     /// replica picks the published dictionary up.
     #[serde(default)]
     pub autotrain: Option<crate::train::AutoTrainCfg>,
+    /// Kubernetes API for autotrain's Lease and ConfigMap, and for the node and GPU shown per pod. Default: in-cluster
+    /// (KUBERNETES_SERVICE_HOST); outside a cluster, none.
+    #[serde(default)]
+    pub kube_api: Option<String>,
+    /// Default: the pod's own namespace.
+    #[serde(default)]
+    pub kube_namespace: Option<String>,
+    /// The adaptive limit never admits fewer than this many in flight per pod on this replica.
+    #[serde(default = "one")]
+    pub min_inflight: usize,
 }
 
 fn one() -> usize {
@@ -213,6 +223,10 @@ pub struct Sample {
     pub kv_cache: f64,
     /// The engine's step counter; None when absent, so stall detection fails open.
     pub iterations: Option<f64>,
+    /// Tokens served: vLLM prompt + generation, zev's pass tokens (prefix-cached ones included: they are served work).
+    pub tokens: Option<f64>,
+    /// zev only: GPU seconds spent in passes, so its rate is per busy second by construction.
+    pub busy_s: Option<f64>,
 }
 
 pub fn parse_metrics(body: &str) -> Sample {
@@ -231,6 +245,10 @@ pub fn parse_metrics(body: &str) -> Sample {
             "vllm:num_requests_waiting" => s.waiting = v,
             "vllm:kv_cache_usage_perc" => s.kv_cache = v,
             "vllm:iteration_tokens_total_count" => s.iterations = Some(v),
+            "vllm:prompt_tokens_total"
+            | "vllm:generation_tokens_total"
+            | "zev_pass_tokens_total" => s.tokens = Some(s.tokens.unwrap_or(0.0) + v),
+            "zev_pass_duration_seconds_sum" => s.busy_s = Some(s.busy_s.unwrap_or(0.0) + v),
             // zev serves several models per pod, one series each: summed. in_flight is queued + running, the unit
             // score() divides by; passes_total is the step counter. A Kev pod has no KV cache to fill.
             "zev_in_flight" => zev_load += v,
@@ -362,6 +380,17 @@ pub struct State {
     pub lora_runtime: Option<bool>,
     /// The zstd dictionary id a rented box reports holding (its /zstd-dict); zstd is sent only when it is ours.
     pub box_dict: Option<u32>,
+    /// Busy-only service rate in tokens/s (EWMA) and when it was last measured.
+    pub rate: Option<(f64, Instant)>,
+    /// The learned routing weight: gpu_multiplier until rates are measured, then the pod's rate normalised across its
+    /// pool (Fleet::reweigh), decaying back to gpu_multiplier when no longer measured.
+    pub weight: f64,
+    /// Adaptive in-flight limit on this replica (Gradient2): starts at cap, grows while latency stays near its
+    /// baseline, halves on a 429, 5xx, timeout or stall. Admission uses it clamped to [min_inflight, cap].
+    pub limit: f64,
+    /// Time to response headers: short EWMA and the long one that serves as baseline.
+    pub latency: Option<(f64, f64)>,
+    pub last_cut: Option<Instant>,
 }
 
 #[derive(Debug)]
@@ -380,6 +409,13 @@ const KV_CLIFF: f64 = 0.95;
 /// How long a model name stays "known" after the last pod listing it went away: a request for it then fails fast
 /// instead of falling back to a pod that would answer with another adapter (zev answers any name with its own).
 const MODEL_MEMORY: Duration = Duration::from_secs(3600);
+const RATE_ALPHA: f64 = 0.3;
+/// A learned weight with no fresh measurement fades back to gpu_multiplier with this half-life.
+const RATE_HALF_LIFE_S: f64 = 300.0;
+/// Gradient2's rttTolerance: latency may run this far over its baseline before the limit shrinks.
+const LATENCY_TOLERANCE: f64 = 1.5;
+/// No more than one halving a second: a burst of failures already in flight is one event.
+const CUT_EVERY: Duration = Duration::from_secs(1);
 
 impl Pod {
     pub fn new(addr: SocketAddr, up: Arc<Upstream>, replicas: usize) -> Self {
@@ -393,6 +429,11 @@ impl Pod {
             models: Vec::new(),
             lora_runtime: None,
             box_dict: None,
+            rate: None,
+            weight: up.gpu_multiplier,
+            limit: cap as f64,
+            latency: None,
+            last_cut: None,
         };
         Pod {
             addr,
@@ -414,7 +455,7 @@ impl Pod {
         if Self::stalled(st, now, stall) || now.duration_since(seen) > STALE {
             return 0.0;
         }
-        let mut score = self.up.gpu_multiplier / (1.0 + st.sample.running + st.sample.waiting);
+        let mut score = st.weight / (1.0 + st.sample.running + st.sample.waiting);
         if st.sample.kv_cache > KV_CLIFF {
             score *= 0.1;
         }
@@ -428,13 +469,67 @@ impl Pod {
     }
 
     pub fn fail(&self) {
-        self.state.lock().unwrap().failing_until = Some(Instant::now() + FAIL_FOR);
+        let mut st = self.state.lock().unwrap();
+        st.failing_until = Some(Instant::now() + FAIL_FOR);
+        Self::cut(&mut st);
+    }
+
+    /// Multiplicative decrease of the adaptive limit.
+    pub fn cut(st: &mut State) {
+        let now = Instant::now();
+        if st
+            .last_cut
+            .is_none_or(|t| now.duration_since(t) >= CUT_EVERY)
+        {
+            st.limit = (st.limit * 0.5).max(1.0);
+            st.last_cut = Some(now);
+        }
+    }
+
+    /// A response's time to headers (Gradient2): the limit moves toward limit x min(1, 1.5 x baseline / recent) +
+    /// sqrt(limit), so it grows while latency stays near its baseline and shrinks as it inflates.
+    pub fn observe(&self, seconds: f64) {
+        let mut st = self.state.lock().unwrap();
+        let (mut short, mut long) = st.latency.unwrap_or((seconds, seconds));
+        short += 0.1 * (seconds - short);
+        long += 0.01 * (seconds - long);
+        if long > 2.0 * short {
+            long *= 0.95; // latency fell for good: let the baseline follow it down
+        }
+        st.latency = Some((short, long));
+        let gradient = (LATENCY_TOLERANCE * long / short.max(1e-6)).clamp(0.5, 1.0);
+        let target = st.limit * gradient + st.limit.sqrt();
+        st.limit = (0.8 * st.limit + 0.2 * target).clamp(1.0, self.cap as f64);
     }
 
     /// Record a scrape. The stall clock starts when the step counter stops moving while work is queued and is
     /// carried while it stays frozen; an idle pod legitimately stops stepping.
     pub fn record(&self, sample: Sample, now: Instant) {
         let mut st = self.state.lock().unwrap();
+        // Busy-only rate: zev's tokens per GPU-busy second; vLLM's tokens per second over an interval it was busy for
+        // throughout (it has no busy-time counter). Idle time says nothing about capacity.
+        let prev = &st.sample;
+        let d = |a: Option<f64>, b: Option<f64>| a.zip(b).map(|(a, b)| a - b).filter(|d| *d >= 0.0);
+        let rate = match (
+            d(sample.tokens, prev.tokens),
+            d(sample.busy_s, prev.busy_s),
+            st.last_seen,
+        ) {
+            (Some(t), Some(b), _) if b >= 0.05 => Some(t / b),
+            (Some(t), None, Some(seen))
+                if sample.busy_s.is_none()
+                    && prev.running > 0.0
+                    && sample.running > 0.0
+                    && t > 0.0 =>
+            {
+                Some(t / now.duration_since(seen).as_secs_f64().max(1e-3))
+            }
+            _ => None,
+        };
+        if let Some(r) = rate {
+            let r = st.rate.map_or(r, |(old, _)| old + RATE_ALPHA * (r - old));
+            st.rate = Some((r, now));
+        }
         let load = sample.running + sample.waiting;
         let frozen = sample.iterations.is_some()
             && st.last_seen.is_some()
@@ -489,6 +584,9 @@ pub struct Fleet {
     zdict: RwLock<Option<Arc<ZDict>>>,
     zdict_stamp: Mutex<Option<(std::time::SystemTime, u64)>>,
     pub train: Option<Arc<crate::train::Trainer>>,
+    kube: Option<Arc<crate::kube::Kube>>,
+    /// Pod IP -> (node, GPU model), from the Kubernetes API every minute; shown, never used to route.
+    placement: RwLock<HashMap<IpAddr, (String, Option<String>)>>,
 }
 
 /// A dead node blackholes SYN rather than refusing it; the default would be a long wait before failover starts.
@@ -514,12 +612,20 @@ impl Fleet {
             .pool_idle_timeout(None)
             .build()
             .expect("h2c client");
+        let kube =
+            crate::kube::Kube::from_env(cfg.kube_api.as_deref(), cfg.kube_namespace.as_deref())
+                .map(Arc::new);
         let train = cfg.autotrain.clone().map(|t| {
             let path = cfg
                 .zstd_dict
                 .clone()
                 .expect("autotrain needs zstd_dict: where the dictionary is published");
-            Arc::new(crate::train::Trainer::new(t, cfg.zstd_level, path))
+            Arc::new(crate::train::Trainer::new(
+                t,
+                cfg.zstd_level,
+                path,
+                kube.clone(),
+            ))
         });
         let f = Fleet {
             cfg,
@@ -534,6 +640,8 @@ impl Fleet {
             zdict: RwLock::new(None),
             zdict_stamp: Mutex::new(None),
             train,
+            kube,
+            placement: RwLock::new(HashMap::new()),
         };
         f.reload_zdict();
         f
@@ -683,7 +791,7 @@ impl Fleet {
                 continue;
             }
             let score = p.score(&st, now, stall);
-            if score > 0.0 && st.held < p.cap {
+            if score > 0.0 && st.held < self.room(p, &st) {
                 cands.push((score, p));
             }
         }
@@ -746,14 +854,50 @@ impl Fleet {
             .any(|p| {
                 let st = p.state.lock().unwrap();
                 Self::eligible(p, &st, w)
-                    && st.held < p.cap
+                    && st.held < self.room(p, &st)
                     && p.score(&st, now, stall) >= ratio * home_score
             })
     }
 
+    /// What admission allows on this pod now: the adaptive limit within [min_inflight, cap].
+    pub fn room(&self, p: &Pod, st: &State) -> usize {
+        (st.limit as usize).clamp(self.cfg.min_inflight.min(p.cap), p.cap)
+    }
+
+    /// Learned weights: per pool, each pod's measured rate per unit of gpu_multiplier against the pool's mean, so a
+    /// pool's total weight stays what was configured and only its split changes. Fewer than two measured pods: the
+    /// configured weights. ponytail: pools are assumed one dialect (zev tokens/busy s vs vLLM tokens/s don't mix).
+    pub fn reweigh(&self, now: Instant) {
+        let pods = self.pods.read().unwrap();
+        // pool -> (pod, (rate per unit of gpu_multiplier, fade)) per member
+        type Members<'a> = Vec<(&'a Arc<Pod>, Option<(f64, f64)>)>;
+        let mut pools: HashMap<&str, Members> = HashMap::new();
+        for p in pods.iter() {
+            let m = p.state.lock().unwrap().rate.map(|(r, at)| {
+                let fade =
+                    0.5f64.powf(now.saturating_duration_since(at).as_secs_f64() / RATE_HALF_LIFE_S);
+                (r / p.up.gpu_multiplier.max(1e-9), fade)
+            });
+            pools.entry(p.up.pool.as_str()).or_default().push((p, m));
+        }
+        for members in pools.values() {
+            let speeds: Vec<f64> = members.iter().filter_map(|(_, m)| m.map(|m| m.0)).collect();
+            let mean = speeds.iter().sum::<f64>() / speeds.len().max(1) as f64;
+            for (p, m) in members {
+                let seed = p.up.gpu_multiplier;
+                p.state.lock().unwrap().weight = match m {
+                    Some((speed, fade)) if speeds.len() >= 2 && mean > 0.0 => {
+                        seed * (1.0 + fade * (speed / mean - 1.0))
+                    }
+                    _ => seed,
+                };
+            }
+        }
+    }
+
     pub fn take(&self, p: &Arc<Pod>) -> bool {
         let mut st = p.state.lock().unwrap();
-        if st.held < p.cap {
+        if st.held < self.room(p, &st) {
             st.held += 1;
             true
         } else {
@@ -842,8 +986,9 @@ impl Fleet {
                 match text(get("/metrics").await).await {
                     Some(b) => {
                         p.record(parse_metrics(&b), Instant::now());
-                        let st = p.state.lock().unwrap();
+                        let mut st = p.state.lock().unwrap();
                         if st.stalled_since.is_some_and(|t| t.elapsed() >= stall) {
+                            Pod::cut(&mut st);
                             log::error!(
                                 "stalled engine on {} ({}): step counter frozen with work queued",
                                 p.addr,
@@ -886,6 +1031,7 @@ impl Fleet {
             });
         }
         while set.join_next().await.is_some() {}
+        self.reweigh(Instant::now());
         self.freed.notify_waiters();
     }
 
@@ -939,6 +1085,15 @@ impl Fleet {
         p.state.lock().unwrap().box_dict = id;
     }
 
+    /// Where each pod runs, for /balancer-status. Without a client or the RBAC to list pods, nothing is shown.
+    pub async fn refresh_placement(&self) {
+        let Some(k) = &self.kube else { return };
+        match k.placement().await {
+            Ok(m) => *self.placement.write().unwrap() = m,
+            Err(e) => log::warn!("pod placement (node, GPU) unavailable: {e}"),
+        }
+    }
+
     /// The dictionary to compress for this box with, if it holds ours. None with a dictionary configured means: send
     /// it uncompressed until the box confirms; with none configured, plain zstd.
     pub fn box_ready(&self, p: &Pod) -> Result<Option<Arc<ZDict>>, ()> {
@@ -952,6 +1107,7 @@ impl Fleet {
     pub fn status_json(&self) -> String {
         let now = Instant::now();
         let stall = self.stall();
+        let place = self.placement.read().unwrap();
         let pods: Vec<_> = self
             .pods
             .read()
@@ -971,6 +1127,11 @@ impl Fleet {
                     "text_only": p.up.text_only, "compress": format!("{:?}", p.up.compress).to_lowercase(),
                     "http2": p.up.http2, "external": p.up.api_key.is_some(),
                     "seconds_since_scrape": st.last_seen.map(|t| now.duration_since(t).as_secs_f64()),
+                    // learned
+                    "weight": st.weight, "seed_weight": p.up.gpu_multiplier, "rate": st.rate.map(|r| r.0),
+                    "limit": st.limit, "room": self.room(p, &st),
+                    "latency_s": st.latency.map(|l| l.0), "latency_baseline_s": st.latency.map(|l| l.1),
+                    "node": place.get(&p.addr.ip()).map(|x| &x.0), "gpu": place.get(&p.addr.ip()).and_then(|x| x.1.as_ref()),
                 })
             })
             .collect();
@@ -1014,6 +1175,23 @@ impl Fleet {
                 "zev_router_pod_failing",
                 "1 if the pod failed a request or a scrape in the last 30 s; scored down",
             ),
+            (
+                "zev_router_pod_weight",
+                "learned routing weight (gpu_multiplier until rates are measured)",
+            ),
+            ("zev_router_pod_seed_weight", "configured gpu_multiplier"),
+            (
+                "zev_router_pod_rate",
+                "busy-only service rate, tokens/s (0 = not measured)",
+            ),
+            (
+                "zev_router_pod_limit",
+                "adaptive in-flight limit on this replica",
+            ),
+            (
+                "zev_router_pod_latency_baseline_seconds",
+                "long-run time to response headers the limit compares against",
+            ),
         ];
         let pods = self.pods.read().unwrap();
         for (i, (name, help)) in gauges.iter().enumerate() {
@@ -1026,7 +1204,12 @@ impl Fleet {
                     2 => p.score(&st, now, stall),
                     3 => st.sample.running + st.sample.waiting,
                     4 => Pod::stalled(&st, now, stall) as u8 as f64,
-                    _ => st.failing_until.is_some_and(|t| now < t) as u8 as f64,
+                    5 => st.failing_until.is_some_and(|t| now < t) as u8 as f64,
+                    6 => st.weight,
+                    7 => p.up.gpu_multiplier,
+                    8 => st.rate.map_or(0.0, |r| r.0),
+                    9 => st.limit,
+                    _ => st.latency.map_or(0.0, |l| l.1),
                 };
                 let _ = writeln!(
                     out,
@@ -1045,6 +1228,17 @@ impl Fleet {
                     "zev_router_pod_model{{pool=\"{}\",upstream=\"{}\",pod=\"{}\",model=\"{}\",parent=\"{}\",max_len=\"{}\"}} 1",
                     p.up.pool, p.up.name, p.addr, esc(&m.id), esc(m.parent.as_deref().unwrap_or("")),
                     m.max_len.map_or(String::new(), |l| l.to_string())
+                );
+            }
+        }
+        let place = self.placement.read().unwrap();
+        let _ = writeln!(out, "# HELP zev_router_pod_info 1 per pod with its node and GPU model from the Kubernetes API\n# TYPE zev_router_pod_info gauge");
+        for p in pods.iter() {
+            if let Some((node, gpu)) = place.get(&p.addr.ip()) {
+                let _ = writeln!(
+                    out,
+                    "zev_router_pod_info{{pool=\"{}\",upstream=\"{}\",pod=\"{}\",node=\"{node}\",gpu=\"{}\"}} 1",
+                    p.up.pool, p.up.name, p.addr, gpu.as_deref().unwrap_or("")
                 );
             }
         }
@@ -1138,7 +1332,8 @@ mod tests {
                 running: 9.0,
                 waiting: 0.0,
                 kv_cache: 0.0,
-                iterations: Some(105.0)
+                iterations: Some(105.0),
+                ..Default::default()
             }
         );
         let vllm = "vllm:num_requests_running{m=\"x\"} 3\nvllm:num_requests_waiting{m=\"x\"} 2\n\
@@ -1150,7 +1345,8 @@ mod tests {
                 running: 3.0,
                 waiting: 2.0,
                 kv_cache: 0.5,
-                iterations: Some(42.0)
+                iterations: Some(42.0),
+                ..Default::default()
             }
         );
         assert_eq!(
@@ -1624,5 +1820,108 @@ mod tests {
         f.reload_zdict();
         assert_eq!(f.zdict().unwrap().id, b);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn busy_only_rates_and_pool_normalised_weights() {
+        let t0 = Instant::now();
+        let zev = |tokens, busy| Sample {
+            running: 1.0,
+            tokens: Some(tokens),
+            busy_s: Some(busy),
+            ..Default::default()
+        };
+        let vllm = |running, tokens| Sample {
+            running,
+            tokens: Some(tokens),
+            ..Default::default()
+        };
+        let f = fleet(vec![
+            ("10.0.0.1:1", up("fast", "kev", 10.0, 8), 0.0),
+            ("10.0.0.2:1", up("slow", "kev", 10.0, 8), 0.0),
+            ("10.0.0.3:1", up("new", "kev", 10.0, 8), 0.0),
+            ("10.0.0.4:1", up("alone", "solo", 5.0, 8), 0.0),
+            ("10.0.0.5:1", up("v", "default", 5.0, 8), 0.0),
+        ]);
+        let pods = f.pods.read().unwrap().clone();
+        let at = |s| t0 + Duration::from_secs(s);
+        // zev: tokens per GPU-busy second, however long the wall interval.
+        pods[0].record(zev(0.0, 0.0), at(1));
+        pods[0].record(zev(2000.0, 1.0), at(6));
+        pods[1].record(zev(0.0, 0.0), at(1));
+        pods[1].record(zev(1000.0, 1.0), at(6));
+        pods[3].record(zev(0.0, 0.0), at(1));
+        pods[3].record(zev(500.0, 1.0), at(6));
+        assert_eq!(pods[0].state.lock().unwrap().rate.unwrap().0, 2000.0);
+        // vLLM: only an interval busy throughout counts.
+        pods[4].record(vllm(0.0, 0.0), at(1));
+        pods[4].record(vllm(3.0, 500.0), at(6));
+        assert!(
+            pods[4].state.lock().unwrap().rate.is_none(),
+            "idle at the start: says nothing about capacity"
+        );
+        pods[4].record(vllm(3.0, 1500.0), at(11));
+        assert_eq!(pods[4].state.lock().unwrap().rate.unwrap().0, 200.0);
+
+        f.reweigh(at(6));
+        let w = |i: usize| pods[i].state.lock().unwrap().weight;
+        assert!(
+            (w(0) - 13.333).abs() < 0.01 && (w(1) - 6.667).abs() < 0.01,
+            "{} {}",
+            w(0),
+            w(1)
+        );
+        assert!(
+            (w(0) + w(1) - 20.0).abs() < 1e-9,
+            "the pool keeps its configured total"
+        );
+        assert_eq!(w(2), 10.0, "not measured yet: its seed");
+        assert_eq!(w(3), 5.0, "alone in its pool: nothing to compare against");
+        f.reweigh(at(6 + 300));
+        assert!(
+            (w(0) - 11.667).abs() < 0.01,
+            "a stale rate fades halfway back in one half-life: {}",
+            w(0)
+        );
+    }
+
+    #[test]
+    fn adaptive_limit_grows_at_baseline_and_cuts_on_trouble() {
+        let mut cfg: Config = serde_json::from_str(r#"{"listen":"0:0","upstreams":[]}"#).unwrap();
+        cfg.min_inflight = 2;
+        let f = Fleet::new(cfg);
+        let p = Pod::new("1.1.1.1:1".parse().unwrap(), up("a", "kev", 10.0, 32), 1);
+        let lim = || p.state.lock().unwrap().limit;
+        assert_eq!(lim(), 32.0, "seeded at the cap");
+        for _ in 0..200 {
+            p.observe(1.0);
+        }
+        assert_eq!(lim(), 32.0, "steady latency: stays at the cap");
+        for _ in 0..30 {
+            p.observe(5.0);
+        }
+        let inflated = lim();
+        assert!(inflated < 20.0, "5x the baseline shrinks it: {inflated}");
+        p.fail();
+        assert!((lim() - inflated / 2.0).abs() < 1e-9, "a failure halves it");
+        p.fail();
+        assert!(
+            (lim() - inflated / 2.0).abs() < 1e-9,
+            "once a second, however many failures land together"
+        );
+        p.state.lock().unwrap().limit = 1.0;
+        assert_eq!(
+            f.room(&p, &p.state.lock().unwrap()),
+            2,
+            "never under min_inflight"
+        );
+        for _ in 0..300 {
+            p.observe(1.0);
+        }
+        assert!(
+            lim() > 30.0,
+            "latency back at baseline: it grows back: {}",
+            lim()
+        );
     }
 }

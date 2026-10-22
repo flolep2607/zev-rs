@@ -14,10 +14,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 
-use base64::Engine as _;
 use bytes::Bytes;
 use serde::Deserialize;
 use serde_json::{json, Value};
+
+use crate::kube::Kube;
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct AutoTrainCfg {
@@ -48,13 +49,6 @@ pub struct AutoTrainCfg {
     /// The ConfigMap key, i.e. the file name `zstd_dict` points at in the mounted directory.
     #[serde(default = "dict_key")]
     pub key: String,
-    /// Default: the pod's own namespace.
-    #[serde(default)]
-    pub namespace: Option<String>,
-    /// API server base URL. Default: in-cluster (KUBERNETES_SERVICE_HOST, the service account token and CA); without
-    /// either the router is its own leader and writes `zstd_dict` itself.
-    #[serde(default)]
-    pub api: Option<String>,
     #[serde(default = "thirty")]
     pub lease_s: u64,
 }
@@ -216,12 +210,11 @@ pub struct Trainer {
     st: Mutex<Status>,
     running: AtomicBool,
     leader: AtomicBool,
-    kube: Option<Kube>,
+    kube: Option<Arc<Kube>>,
 }
 
 impl Trainer {
-    pub fn new(cfg: AutoTrainCfg, level: i32, dict_path: String) -> Self {
-        let kube = Kube::from_env(&cfg);
+    pub fn new(cfg: AutoTrainCfg, level: i32, dict_path: String, kube: Option<Arc<Kube>>) -> Self {
         log::warn!(
             "zstd dictionary auto-training on: {}",
             match &kube {
@@ -283,7 +276,7 @@ impl Trainer {
     /// Every background tick: renew the Lease, and if leader and a training is due, start one on its own thread.
     pub async fn tick(self: &Arc<Self>, current: Option<Bytes>) {
         let leader = match &self.kube {
-            Some(k) => k.lead(&self.cfg).await,
+            Some(k) => k.lead(&self.cfg.lease, self.cfg.lease_s).await,
             None => true,
         };
         if leader != self.leader.swap(leader, Ordering::Relaxed) {
@@ -392,7 +385,10 @@ impl Trainer {
 
     async fn publish(&self, dict: &[u8]) -> Result<(), String> {
         match &self.kube {
-            Some(k) => k.put_configmap(&self.cfg, dict).await,
+            Some(k) => {
+                k.put_configmap(&self.cfg.configmap, &self.cfg.key, dict)
+                    .await
+            }
             None => {
                 let tmp = format!("{}.tmp", self.dict_path);
                 std::fs::write(&tmp, dict)
@@ -460,165 +456,6 @@ impl Trainer {
     }
 }
 
-/// Just enough of the Kubernetes API: one Lease, one ConfigMap.
-struct Kube {
-    http: reqwest::Client,
-    base: String,
-    ns: String,
-    /// Read again per call: a projected service account token rotates.
-    token_file: Option<String>,
-    id: String,
-    /// client-go's rule: a Lease is expired once its record has not changed for lease_s by *our* clock, so no two
-    /// clocks are compared.
-    observed: Mutex<Option<(Value, Instant)>>,
-}
-
-const SA: &str = "/var/run/secrets/kubernetes.io/serviceaccount";
-
-impl Kube {
-    fn from_env(cfg: &AutoTrainCfg) -> Option<Self> {
-        let in_cluster = std::env::var("KUBERNETES_SERVICE_HOST")
-            .ok()
-            .zip(std::env::var("KUBERNETES_SERVICE_PORT").ok());
-        let (base, token_file, ca) = match (&cfg.api, in_cluster) {
-            (Some(api), _) => (api.trim_end_matches('/').to_string(), None, None),
-            (None, Some((h, p))) => (
-                format!("https://{h}:{p}"),
-                Some(format!("{SA}/token")),
-                std::fs::read(format!("{SA}/ca.crt")).ok(),
-            ),
-            (None, None) => return None,
-        };
-        let mut b = reqwest::Client::builder().timeout(Duration::from_secs(5));
-        if let Some(c) = ca
-            .as_deref()
-            .and_then(|c| reqwest::Certificate::from_pem(c).ok())
-        {
-            b = b.add_root_certificate(c);
-        }
-        let ns = cfg
-            .namespace
-            .clone()
-            .or_else(|| std::fs::read_to_string(format!("{SA}/namespace")).ok())
-            .unwrap_or_else(|| "default".into());
-        let id = std::env::var("HOSTNAME")
-            .unwrap_or_else(|_| format!("zev-router-{:08x}", rand::random::<u32>()));
-        Some(Kube {
-            http: b.build().expect("kube client"),
-            base,
-            ns: ns.trim().into(),
-            token_file,
-            id,
-            observed: Mutex::new(None),
-        })
-    }
-
-    fn req(&self, m: reqwest::Method, path: &str) -> reqwest::RequestBuilder {
-        let r = self.http.request(m, format!("{}{path}", self.base));
-        match self
-            .token_file
-            .as_ref()
-            .and_then(|f| std::fs::read_to_string(f).ok())
-        {
-            Some(t) => r.bearer_auth(t.trim()),
-            None => r,
-        }
-    }
-
-    /// Hold the Lease: create it, renew it, or take it over once expired. Any error = not leader.
-    async fn lead(&self, cfg: &AutoTrainCfg) -> bool {
-        use reqwest::{Method, StatusCode};
-        let dir = format!("/apis/coordination.k8s.io/v1/namespaces/{}/leases", self.ns);
-        let now = chrono::Utc::now()
-            .format("%Y-%m-%dT%H:%M:%S%.6fZ")
-            .to_string();
-        let spec = json!({ "holderIdentity": self.id, "leaseDurationSeconds": cfg.lease_s, "renewTime": now });
-        let got = match self
-            .req(Method::GET, &format!("{dir}/{}", cfg.lease))
-            .send()
-            .await
-        {
-            Ok(r) if r.status() == StatusCode::NOT_FOUND => None,
-            Ok(r) if r.status().is_success() => match r.json::<Value>().await {
-                Ok(v) => Some(v),
-                Err(_) => return false,
-            },
-            Ok(r) => {
-                log::warn!("Lease {}: {}", cfg.lease, r.status());
-                return false;
-            }
-            Err(e) => {
-                log::warn!("Lease {}: {e}", cfg.lease);
-                return false;
-            }
-        };
-        let send = match got {
-            None => {
-                let mut spec = spec;
-                spec["acquireTime"] = json!(now);
-                self.req(Method::POST, &dir)
-                    .json(&json!({ "apiVersion": "coordination.k8s.io/v1", "kind": "Lease", "metadata": { "name": cfg.lease }, "spec": spec }))
-            }
-            Some(mut lease) => {
-                let record = lease["spec"].clone();
-                let holder = record["holderIdentity"].as_str().unwrap_or("");
-                let fresh = {
-                    let mut o = self.observed.lock().unwrap();
-                    if o.as_ref().is_none_or(|(r, _)| *r != record) {
-                        *o = Some((record.clone(), Instant::now()));
-                    }
-                    o.as_ref().unwrap().1.elapsed() < Duration::from_secs(cfg.lease_s)
-                };
-                if !holder.is_empty() && holder != self.id && fresh {
-                    return false;
-                }
-                if holder != self.id {
-                    lease["spec"]["acquireTime"] = json!(now);
-                }
-                for k in ["holderIdentity", "leaseDurationSeconds", "renewTime"] {
-                    lease["spec"][k] = spec[k].clone();
-                }
-                // metadata.resourceVersion rides along: a replica that renewed in between makes this a 409.
-                self.req(Method::PUT, &format!("{dir}/{}", cfg.lease))
-                    .json(&lease)
-            }
-        };
-        send.send().await.is_ok_and(|r| r.status().is_success())
-    }
-
-    async fn put_configmap(&self, cfg: &AutoTrainCfg, dict: &[u8]) -> Result<(), String> {
-        use reqwest::{Method, StatusCode};
-        let dir = format!("/api/v1/namespaces/{}/configmaps", self.ns);
-        let b64 = base64::engine::general_purpose::STANDARD.encode(dict);
-        let r = self
-            .req(Method::GET, &format!("{dir}/{}", cfg.configmap))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        let send = if r.status() == StatusCode::NOT_FOUND {
-            self.req(Method::POST, &dir).json(&json!({
-                "apiVersion": "v1", "kind": "ConfigMap", "metadata": { "name": cfg.configmap }, "binaryData": { (cfg.key.clone()): b64 },
-            }))
-        } else if r.status().is_success() {
-            let mut cm: Value = r.json().await.map_err(|e| e.to_string())?;
-            if let Some(d) = cm.get_mut("data").and_then(Value::as_object_mut) {
-                d.remove(&cfg.key);
-            }
-            cm["binaryData"][&cfg.key] = json!(b64);
-            self.req(Method::PUT, &format!("{dir}/{}", cfg.configmap))
-                .json(&cm)
-        } else {
-            return Err(format!("GET ConfigMap {}: {}", cfg.configmap, r.status()));
-        };
-        let r = send.send().await.map_err(|e| e.to_string())?;
-        if r.status().is_success() {
-            Ok(())
-        } else {
-            Err(format!("ConfigMap {}: {}", cfg.configmap, r.status()))
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -676,7 +513,7 @@ mod tests {
         c.max_bytes = 25;
         let t = Trainer {
             kube: None,
-            ..Trainer::new(c, 3, "/nonexistent".into())
+            ..Trainer::new(c, 3, "/nonexistent".into(), None)
         };
         for i in 0..5u8 {
             t.sample(&Bytes::from(vec![i; 10]));

@@ -28,9 +28,9 @@ screenshot prompt).
 5. **Admission**. With the `affinity_header` (default `x-session-id`), the session's **home** pod (weighted rendezvous
    hash: every replica agrees, losing a pod rehomes only its sessions) if it has a free slot. A full home is waited for
    up to `affinity_wait_s`, unless another pod with room scores `spill_ratio` times the home. Otherwise a
-   **weighted-random pod with a free slot**, scored `gpu_multiplier / (1 + running + waiting)` from the pod's own
+   **weighted-random pod with a free slot**, scored `weight / (1 + running + waiting)` from the pod's own
    `/metrics` (x0.1 over 95% KV cache, x0.5 on a sample older than 15 s, x0.05 for 30 s after a failure; a stalled pod
-   scores 0). Every pod full: wait for a release (woken by a `Notify`), up to `queue_timeout_s`, then 503. No pod in
+   scores 0). `weight` is learned and a free slot is below the adaptive limit (next section). Every pod full: wait for a release (woken by a `Notify`), up to `queue_timeout_s`, then 503. No pod in
    the pool: 502 at once.
 6. **Attempts**, up to 3: a connect error, no headers within 600 s, or a **429/500/502/503** goes to an untried pod,
    and the pod is scored down for 30 s. With no untried pod left, the last answer is passed through.
@@ -95,7 +95,7 @@ tick. Expiry is judged as client-go does: a Lease whose record has not changed f
 two clocks are compared. The leader writes the dictionary as `binaryData[key]` of the ConfigMap `configmap`. Every
 replica mounts that ConfigMap as the directory holding `zstd_dict`, so the kubelet refreshes the file (within about a
 minute) and the existing reload and box sync take it from there. If the API cannot be reached, nobody leads and the
-dictionary in use stays. With neither `api` nor `KUBERNETES_SERVICE_HOST`, the router leads alone and writes
+dictionary in use stays. With neither `kube_api` nor `KUBERNETES_SERVICE_HOST`, the router leads alone and writes
 `zstd_dict` itself.
 
 Mount the whole ConfigMap as a directory, **not with `subPath`**: a subPath mount is never refreshed. The router needs:
@@ -112,7 +112,49 @@ rules:
   - { apiGroups: [""], resources: [configmaps], verbs: [create] }
 ```
 
-Bound to the router's ServiceAccount with a RoleBinding. The identity is `HOSTNAME`, i.e. the pod name.
+Bind it to the router's ServiceAccount with a RoleBinding. The identity is `HOSTNAME`, i.e. the pod name.
+
+## Learned weights and adaptive limits
+
+**Weight.** `gpu_multiplier` is only the seed. Each scrape measures a pod's service rate while it is busy:
+
+- **zev**: `zev_pass_tokens_total` over `zev_pass_duration_seconds_sum`, i.e. tokens per GPU-busy second, by
+  construction.
+- **vLLM**: prompt plus generation tokens per second, counted only over an interval it was running throughout. vLLM
+  has no busy-time counter, and partial batches read low.
+
+That rate goes into an EWMA (α 0.3). Per pool, each pod's rate per unit of `gpu_multiplier` is set against the pool
+mean, giving `weight = gpu_multiplier × rate share`, so a pool keeps its configured total weight and only the split
+moves. A pod not measured yet keeps its seed, and so does a pool with under two measured pods. A rate that is no longer
+refreshed fades back to the seed with a 5 min half-life. A pool is assumed to speak one dialect. The session home's
+rendezvous hash keeps using `gpu_multiplier`: learned weights differ slightly per replica, and replicas must agree on
+homes.
+
+**Limit (Gradient2).** Each pod's in-flight limit on this replica starts at its cap. On every response, the router
+measures time to headers and keeps two EWMAs: a short one (α 0.1) and a long one (α 0.01) that serves as the baseline.
+The limit moves toward `limit × clamp(1.5 × baseline / short, 0.5, 1) + √limit`, smoothed by 0.2:
+
+- While latency stays within 1.5× its baseline, the limit grows back to the cap.
+- As latency inflates, the limit shrinks.
+- A 429, a 5xx, a transport error or timeout, or a stall halves it, at most once a second.
+
+Admission uses the limit clamped to [`min_inflight` (default 1), cap]. **Both bounds are per replica**: cap is
+`max_inflight / replicas` rounded up, and `min_inflight` is what each replica keeps open per pod, so the fleet-wide floor
+is `min_inflight × replicas`.
+
+**Placement.** With a Kubernetes client (in-cluster, or `kube_api`), the router lists the Running pods of its namespace
+every minute and reads each node's `nvidia.com/gpu.product` label. `/balancer-status` shows `node` and `gpu`, and
+`/metrics` shows `zev_router_pod_info{node,gpu}`. This is display only. It needs `list pods` in the namespace and
+`get nodes` (a ClusterRole). Without them, or for a rented box, nothing is shown and a warning is logged.
+
+```yaml
+  - { apiGroups: [""], resources: [pods], verbs: [list] }   # in the Role above
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata: { name: zev-router-nodes }
+rules: [{ apiGroups: [""], resources: [nodes], verbs: [get] }]
+```
 
 ## In the background, every `metrics_interval_s`
 
@@ -132,9 +174,11 @@ discovered facts.
 
 - `/ready`
 - `/balancer-status`: JSON per pod (pool, held/cap, score, load, stalled, failing; discovered `models`, `lora_runtime`,
-  `box_dict`; configured `text_only`, `compress`, `http2`, `external`), the router's `zstd_dict` id, `drained_s`, and
+  `box_dict`; configured `text_only`, `compress`, `http2`, `external`; learned `weight`, `seed_weight`, `rate`, `limit`,
+  `room`, `latency_s`, `latency_baseline_s`; `node`, `gpu`), the router's `zstd_dict` id, `drained_s`, and
   `autotrain` (leader, samples, live and baseline ratios, trainings, last reason/result/ratios/time).
-- `/metrics`: `zev_router_pod_{held,cap,score,load,stalled,failing}`, `zev_router_pod_model{model,parent,max_len}`
+- `/metrics`: `zev_router_pod_{held,cap,score,load,stalled,failing,weight,seed_weight,rate,limit}`,
+  `zev_router_pod_latency_baseline_seconds`, `zev_router_pod_info{node,gpu}`, `zev_router_pod_model{model,parent,max_len}`
   (one series per model or adapter a pod lists), `zev_router_pod_box_dict`, `zev_router_zstd_dict_id`,
   `zev_router_responses_total{pool,status}`, `zev_router_drained`, `zev_router_capture_dropped_total`, and with
   `autotrain` `zev_router_zdict_{leader,samples,live_ratio,baseline_ratio,trainings,last_training_timestamp_seconds}`.
@@ -178,8 +222,8 @@ replica under-admits, the safe direction). Defaults: `metrics_interval_s` 5, `st
 `compress_min` 4096, `compress_level` 1 (zlib), `zstd_level` 3, `max_body_bytes` 100 MiB; capture: `check_interval_s` 30,
 `max_request_bytes` 25 MiB, `max_response_bytes` 2 MiB, `max_pending` 2, `timeout_ms` 500; autotrain: `every_s` 86400,
 `min_interval_s` 3600, `drift` 0.8, `margin` 0.03, `min_samples` 500, `max_samples` 2000, `max_bytes` 130 MiB,
-`dict_bytes` 110000, `lease`/`configmap` `zev-router-zdict`, `key` `prompts.zdict`, `lease_s` 30, `namespace` the pod's,
-`api` in-cluster.
+`dict_bytes` 110000, `lease`/`configmap` `zev-router-zdict`, `key` `prompts.zdict`, `lease_s` 30. `min_inflight` 1;
+`kube_api` in-cluster, `kube_namespace` the pod's.
 
 ## Against florian-nginx
 
@@ -197,12 +241,14 @@ temp file instead); vLLM pods stay on HTTP/1.1 keep-alive (uvicorn has no HTTP/2
 
     cargo test        # parsing, stall detection, pools, caps, weights, text-only, homing + spill, the rented-box
                       # registry (zstd/deflate marks, never on a configured upstream), drain, image scan, model,
-                      # zlib and zstd + dictionary round trips
+                      # zlib and zstd + dictionary round trips, busy-only rates + pool-normalised weights,
+                      # the Gradient2 limit, the training trigger and gate
     python3 smoke.py  # the real binary against fake pods, a fake capture receiver and a rented-box file: 429 retry
                       # with a 200 KB body, stall skip, model pool, image routing, rented key + deflate, capture,
                       # affinity, drain cutting a live stream and reopening, a zstd + dictionary box beating zlib,
                       # in-cluster pods never compressed, h2c: 200 requests at 50 concurrent over one TCP
-                      # connection to a zev-like pod. Needs `cargo build --example fake_h2c_pod` and the
+                      # connection to a zev-like pod, traffic following the learned weights (4x the busy rate ->
+                      # ~80% of picks at equal gpu_multiplier), an inflating pod's limit cut. Needs `cargo build --example fake_h2c_pod` and the
                       # zstandard Python package.
     python3 smoke_train.py  # two replicas, a stub Kubernetes API, a real inflate_mw box: only the Lease holder
                             # trains, publishes to the ConfigMap, both replicas and the box take the dictionary, a

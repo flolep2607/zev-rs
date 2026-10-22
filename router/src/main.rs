@@ -14,6 +14,7 @@
 
 mod capture;
 mod fleet;
+mod kube;
 mod train;
 
 use std::collections::HashSet;
@@ -334,12 +335,16 @@ impl Router {
         let mut tried = HashSet::new();
         let resp = loop {
             tried.insert(pod.addr);
+            let t0 = Instant::now();
             let res = self.attempt(session, &pod, body.as_ref().unwrap()).await;
             let retryable = match &res {
                 Ok(r) => matches!(r.status().as_u16(), 429 | 500 | 502 | 503),
                 Err(_) => true,
             };
             if !retryable {
+                if res.is_ok() {
+                    pod.observe(t0.elapsed().as_secs_f64());
+                }
                 break res;
             }
             // A zev pod answers 429 when its queue is full, and a wedged one answers nothing else: 1.04M of them in
@@ -532,6 +537,7 @@ impl BackgroundService for Background {
             .as_ref()
             .map_or(30, |c| c.check_interval_s.max(1));
         let mut check = tokio::time::interval(Duration::from_secs(check_every));
+        let mut place = tokio::time::interval(Duration::from_secs(60));
         loop {
             tokio::select! {
                 _ = shutdown.changed() => return,
@@ -543,6 +549,7 @@ impl BackgroundService for Background {
                         t.tick(self.fleet.zdict().map(|d| d.raw.clone())).await;
                     }
                 }
+                _ = place.tick() => self.fleet.refresh_placement().await,
                 _ = check.tick(), if self.capture.is_some() => self.capture.as_ref().unwrap().check().await,
             }
         }
