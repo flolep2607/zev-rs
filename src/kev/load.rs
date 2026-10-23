@@ -128,7 +128,7 @@ fn tokenizer(dir: &Path) -> Res<tokenizers::Tokenizer> {
         .map_err(|e| format!("{}: {e}", dir.display()).into())
 }
 
-fn device(i: usize) -> Res<Device> {
+pub fn device(i: usize) -> Res<Device> {
     let dev = if cfg!(feature = "cuda") {
         Device::new_cuda(i)?
     } else {
@@ -262,7 +262,7 @@ pub fn load(spec: &str, o: &LoadOpts) -> Res<Served> {
 }
 
 /// A Kev checkpoint (a pointer head next to an adapter): the base the head was trained on, as a spec and a local dir.
-fn kev_base(dir: &Path) -> Res<Option<(String, PathBuf)>> {
+pub fn kev_base(dir: &Path) -> Res<Option<(String, PathBuf)>> {
     let has = |f: &str| dir.join(f).exists();
     if !((has("head.pt") || has("head.safetensors")) && has("adapter_config.json")) {
         return Ok(None);
@@ -289,7 +289,7 @@ const UNMERGED: &str = "unmerged delta on a shared base";
 
 /// Serve Kev backbones (one per device, `--devices` order) with `dir`'s pointer head.
 #[allow(clippy::too_many_arguments)]
-fn kev_served(
+pub fn kev_served(
     spec: &str,
     dir: &Path,
     base_spec: &str,

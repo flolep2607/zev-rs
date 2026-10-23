@@ -41,6 +41,11 @@ name = "convert_head"
 path = "src/bin/convert_head.rs"
 required-features = ["candle"]
 
+[[bin]]
+name = "fast_parity"
+path = "src/bin/fast_parity.rs"
+required-features = ["candle"]
+
 [[example]]
 name = "kev_logits"
 required-features = ["candle"]
