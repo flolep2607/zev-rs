@@ -338,9 +338,10 @@ impl Router {
         };
 
         let mut tried = HashSet::new();
+        let mut t0: Instant; // start of the final attempt, for `upstream_seconds`
         let resp = loop {
             tried.insert(pod.addr);
-            let t0 = Instant::now();
+            t0 = Instant::now();
             let res = self.attempt(session, &pod, body.as_ref().unwrap()).await;
             let retryable = match &res {
                 Ok(r) => matches!(r.status().as_u16(), 429 | 500 | 502 | 503),
@@ -441,6 +442,7 @@ impl Router {
             &pod.up.name,
             started.elapsed().as_secs_f64(),
         );
+        f.time("upstream", &pool, &pod.up.name, t0.elapsed().as_secs_f64());
         if let (Some(cap), Some(r)) = (self.capture.as_ref(), rec.take()) {
             cap.finish(r, status, ctype.as_deref(), &pod.addr.to_string());
         }

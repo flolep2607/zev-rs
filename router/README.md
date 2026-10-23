@@ -178,9 +178,10 @@ discovered facts.
   `room`, `latency_s`, `latency_baseline_s`; `node`, `gpu`), the router's `zstd_dict` id, `drained_s`, and
   `autotrain` (leader, samples, live and baseline ratios, trainings, last reason/result/ratios/time).
 - `/metrics`: `inference_router_pod_{held,cap,score,load,stalled,failing,weight,seed_weight,rate,limit}`,
-  `inference_router_pod_latency_baseline_seconds`, `inference_router_pod_info{node,gpu}`, `inference_router_pod_model{model,parent,max_len}`
-  (one series per model or adapter a pod lists), `inference_router_pod_box_dict`, `inference_router_zstd_dict_id`,
-  `inference_router_responses_total{pool,status}`, `inference_router_drained`, `inference_router_capture_dropped_total`, and with
+  `inference_router_pod_latency_baseline_seconds`, `inference_router_pod_info{node,gpu}`, `inference_router_pod_model{model,parent,max_len,merged}`
+  (one series per model or adapter a pod lists; `merged` is `true`/`false`, or `""` when unknown or when two entries sharing a name disagree), `inference_router_pod_box_dict`, `inference_router_zstd_dict_id`,
+  `inference_router_responses_total{pool,status}`, histograms `inference_router_{queue,request,upstream}_seconds{pool,upstream}`
+  (`upstream` = request sent to the final pod until the last byte relayed, so router overhead = `request` - `upstream`), `inference_router_drained`, `inference_router_capture_dropped_total`, and with
   `autotrain` `inference_router_zdict_{leader,samples,live_ratio,baseline_ratio,trainings,last_training_timestamp_seconds}`.
 - `/drain[?seconds=N]`: close admission for N s (default `drain_seconds`, 0 reopens) and cut every request in flight,
   on every replica: with `peers_dns` it fans out to each one with `&peer=1`. Refused (403) with an

@@ -778,7 +778,7 @@ impl Fleet {
         })
     }
 
-    /// Record `seconds` in histogram `what` ("queue": waiting for a slot; "request": body read to last byte sent),
+    /// Record `seconds` in histogram `what` ("queue": waiting for a slot; "request": body read to last byte sent; "upstream": last attempt sent to last byte sent),
     /// labelled by pool and the upstream that served it.
     pub fn time(&self, what: &'static str, pool: &str, upstream: &str, seconds: f64) {
         self.hists
@@ -1270,13 +1270,27 @@ impl Fleet {
         let _ = writeln!(out, "# HELP inference_router_pod_model 1 per model or LoRA adapter the pod lists on /v1/models (parent = base model of an adapter)\n# TYPE inference_router_pod_model gauge");
         for p in pods.iter() {
             let st = p.state.lock().unwrap();
+            // zev lists an alias under every model that serves it: one series per (model, parent, max_len), and
+            // merged = "" when the entries sharing that key disagree.
+            let mut rows: Vec<(&ModelInfo, Option<bool>)> = Vec::new();
             for m in &st.models {
+                match rows
+                    .iter_mut()
+                    .find(|(r, _)| (&r.id, &r.parent, r.max_len) == (&m.id, &m.parent, m.max_len))
+                {
+                    Some((_, merged)) if *merged != m.merged => *merged = None,
+                    Some(_) => {}
+                    None => rows.push((m, m.merged)),
+                }
+            }
+            for (m, merged) in rows {
                 let esc = |s: &str| s.replace('\\', "\\\\").replace('"', "\\\"");
                 let _ = writeln!(
                     out,
-                    "inference_router_pod_model{{pool=\"{}\",upstream=\"{}\",pod=\"{}\",model=\"{}\",parent=\"{}\",max_len=\"{}\"}} 1",
+                    "inference_router_pod_model{{pool=\"{}\",upstream=\"{}\",pod=\"{}\",model=\"{}\",parent=\"{}\",max_len=\"{}\",merged=\"{}\"}} 1",
                     p.up.pool, p.up.name, p.addr, esc(&m.id), esc(m.parent.as_deref().unwrap_or("")),
-                    m.max_len.map_or(String::new(), |l| l.to_string())
+                    m.max_len.map_or(String::new(), |l| l.to_string()),
+                    merged.map_or(String::new(), |b| b.to_string())
                 );
             }
         }
@@ -1324,6 +1338,10 @@ impl Fleet {
             (
                 "request",
                 "body read to the last response byte, retries included",
+            ),
+            (
+                "upstream",
+                "request sent to the final pod to the last response byte relayed; request minus this is router overhead",
             ),
         ] {
             let name = format!("inference_router_{what}_seconds");
@@ -1560,6 +1578,43 @@ mod tests {
             "merged",
             "the slower card, but the adapter is merged there"
         );
+    }
+
+    #[test]
+    fn pod_model_series_are_unique_and_carry_merged() {
+        let f = fleet(vec![("10.0.0.1:8008", up("zev", "kev", 10.0, 8), 0.0)]);
+        let m = |id: &str, merged| ModelInfo {
+            id: id.into(),
+            parent: None,
+            max_len: None,
+            merged,
+        };
+        f.pods.read().unwrap()[0].state.lock().unwrap().models = vec![
+            m("kev-4b", Some(true)),
+            m("kev-latest", Some(true)),
+            m("kev-latest", Some(true)), // alias of two models, same flag
+            m("jev-latest", Some(true)),
+            m("jev-latest", Some(false)), // alias of two models, flags disagree
+            m("plain", None),
+        ];
+        let out = f.prometheus();
+        let lines: Vec<_> = out
+            .lines()
+            .filter(|l| l.starts_with("inference_router_pod_model{"))
+            .collect();
+        let uniq: HashSet<_> = lines.iter().collect();
+        assert_eq!(lines.len(), uniq.len(), "{lines:#?}");
+        assert_eq!(lines.len(), 4);
+        let has = |model: &str, merged: &str| {
+            lines.iter().any(|l| {
+                l.contains(&format!(
+                    "model=\"{model}\",parent=\"\",max_len=\"\",merged=\"{merged}\"}} 1"
+                ))
+            })
+        };
+        assert!(has("kev-4b", "true") && has("kev-latest", "true"));
+        assert!(has("jev-latest", ""), "ambiguous alias");
+        assert!(has("plain", ""), "unknown");
     }
 
     #[test]
