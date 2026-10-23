@@ -319,6 +319,9 @@ fn kev_served(
 /// the first of them is merged into it (fused int8 path, full speed), each other one attaches unmerged as its own LoRA
 /// minus the merged one's (`Model::with_adapter`), exact. N adapters cost one base plus N-1 small (A, B) sets against N
 /// merged backbones. List the busiest adapter first.
+///
+/// KEV_MERGE_EACH=1 gives every adapter its own merged base instead: all of them on the fused path, for one more base in
+/// VRAM each (~4-5 GB at int8). An unmerged adapter's passes ran 3.4x slower (kev-4b behind agent-4b, 2026-10-23).
 pub fn load_all(specs: &[String], o: &LoadOpts) -> Res<Vec<Served>> {
     let (names, specs): (Vec<Option<&str>>, Vec<&str>) = specs.iter().map(|s| split_name(s)).unzip();
     let mut out = load_specs(&specs, o)?;
@@ -341,7 +344,8 @@ fn split_name(s: &str) -> (Option<&str>, &str) {
 fn load_specs(specs: &[&str], o: &LoadOpts) -> Res<Vec<Served>> {
     let dirs: Vec<PathBuf> = specs.iter().map(|s| resolve(s)).collect::<Res<_>>()?;
     let bases: Vec<Option<(String, PathBuf)>> = dirs.iter().map(|d| kev_base(d)).collect::<Res<_>>()?;
-    let shared = |b: &Path| bases.iter().flatten().filter(|(_, x)| x == b).count() > 1;
+    let merge_each = std::env::var("KEV_MERGE_EACH").is_ok_and(|v| v == "1");
+    let shared = |b: &Path| !merge_each && bases.iter().flatten().filter(|(_, x)| x == b).count() > 1;
     let mut loaded: Vec<(PathBuf, PathBuf, Vec<Model>)> = Vec::new(); // per base dir: the merged adapter, its model per device
     let mut out = Vec::new();
     for ((spec, dir), base) in specs.iter().zip(&dirs).zip(&bases) {
