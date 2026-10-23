@@ -153,7 +153,7 @@ impl Router {
             }
             let home = sid.and_then(|s| f.home(want, s));
             if let Some(h) = &home {
-                if f.take(h) {
+                if f.take(h, want.cost) {
                     return Ok(h.clone());
                 }
             }
@@ -185,11 +185,11 @@ impl Router {
     }
 
     /// Hand the slot back; on failure also score the pod down for 30 s so concurrent requests stop choosing it.
-    fn done(&self, pod: &Pod, failed: bool) {
+    fn done(&self, pod: &Pod, failed: bool, cost: f64) {
         if failed {
             pod.fail();
         }
-        self.fleet.release(pod);
+        self.fleet.release(pod, cost);
     }
 
     /// One attempt: the request to `pod`, the body compressed if it inflates bodies, its key if it is a rented box.
@@ -279,6 +279,7 @@ impl Router {
             }
             buf.extend_from_slice(&chunk);
         }
+        let started = Instant::now();
         let mut body = Some(Bytes::from(buf));
         let b = body.as_ref().unwrap();
 
@@ -298,6 +299,7 @@ impl Router {
             pool: &pool,
             model: pinned,
             needs_image: false,
+            cost: b.len() as f64,
         };
         want.needs_image = f.has_text_only(&want) && carries_image(b);
         let want = want;
@@ -325,7 +327,10 @@ impl Router {
             });
 
         let mut pod = match self.admit(&want, sid.as_deref()).await {
-            Ok(p) => p,
+            Ok(p) => {
+                f.time("queue", &pool, &p.up.name, started.elapsed().as_secs_f64());
+                p
+            }
             Err(Reject(code, why)) => {
                 f.count(&pool, code);
                 return respond(session, code, "text/plain", format!("{why}\n")).await;
@@ -361,7 +366,7 @@ impl Router {
                             .map_or_else(|e| e.clone(), |r| r.status().to_string()),
                         n.addr
                     );
-                    self.done(&pod, true);
+                    self.done(&pod, true, want.cost);
                     pod = n;
                 }
                 // Nowhere left to go: the last answer, even a 429, beats a made-up 502.
@@ -373,7 +378,7 @@ impl Router {
             Ok(r) => r,
             Err(e) => {
                 log::error!("{} failed for good: {e}", pod.addr);
-                self.done(&pod, true);
+                self.done(&pod, true, want.cost);
                 f.count(&pool, 502);
                 return respond(session, 502, "text/plain", "upstream failed\n".into()).await;
             }
@@ -428,8 +433,14 @@ impl Router {
                 }
             }
         }
-        self.done(&pod, failed);
+        self.done(&pod, failed, want.cost);
         f.count(&pool, status);
+        f.time(
+            "request",
+            &pool,
+            &pod.up.name,
+            started.elapsed().as_secs_f64(),
+        );
         if let (Some(cap), Some(r)) = (self.capture.as_ref(), rec.take()) {
             cap.finish(r, status, ctype.as_deref(), &pod.addr.to_string());
         }

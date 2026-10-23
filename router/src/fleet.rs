@@ -374,6 +374,8 @@ pub struct State {
     pub failing_until: Option<Instant>,
     /// Requests this replica has dispatched to the pod and not yet released.
     pub held: usize,
+    /// Their body bytes: the work this replica has queued on the pod, what `reserve` weighs.
+    pub held_cost: f64,
     /// From the pod's /v1/models; kept across a failed fetch.
     pub models: Vec<ModelInfo>,
     /// vLLM with VLLM_ALLOW_RUNTIME_LORA_UPDATING exposes /v1/load_lora_adapter; checked once per pod.
@@ -426,6 +428,7 @@ impl Pod {
             stalled_since: None,
             failing_until: None,
             held: 0,
+            held_cost: 0.0,
             models: Vec::new(),
             lora_runtime: None,
             box_dict: None,
@@ -451,11 +454,17 @@ impl Pod {
     /// Spare capacity weighted by card speed. `running` counts with `waiting`: vLLM reports waiting > 0 only once
     /// running hits --max-num-seqs, so on waiting alone a pod at 31/32 scores the same as one at 2/32.
     pub fn score(&self, st: &State, now: Instant, stall: Duration) -> f64 {
+        self.speed(st, now, stall) / (1.0 + st.sample.running + st.sample.waiting)
+    }
+
+    /// The learned weight with the KV, staleness and failure penalties: how fast this pod is expected to clear work.
+    /// 0 = not selectable (never scraped, stale or wedged).
+    pub fn speed(&self, st: &State, now: Instant, stall: Duration) -> f64 {
         let Some(seen) = st.last_seen else { return 0.0 };
         if Self::stalled(st, now, stall) || now.duration_since(seen) > STALE {
             return 0.0;
         }
-        let mut score = st.weight / (1.0 + st.sample.running + st.sample.waiting);
+        let mut score = st.weight;
         if st.sample.kv_cache > KV_CLIFF {
             score *= 0.1;
         }
@@ -552,6 +561,8 @@ pub struct Want<'a> {
     pub pool: &'a str,
     pub model: Option<&'a str>,
     pub needs_image: bool,
+    /// Body bytes: the request's size, a proxy for its tokens and so its pass time.
+    pub cost: f64,
 }
 
 /// The router's zstd dictionary, as read from `zstd_dict`.
@@ -568,6 +579,8 @@ pub struct Fleet {
     pub freed: Notify,
     /// Responses by (pool, status class), for /metrics.
     responses: Mutex<HashMap<(String, &'static str), u64>>,
+    /// Latency histograms by (metric, pool, upstream), for /metrics: see `time`.
+    hists: Mutex<HashMap<(&'static str, String, String), Hist>>,
     /// /drain: admission closed until then.
     drained_until: Mutex<Option<Instant>>,
     /// Bumped by /drain: every in-flight request watching it drops its upstream connection, which aborts the
@@ -632,6 +645,7 @@ impl Fleet {
             pods: RwLock::new(Vec::new()),
             freed: Notify::new(),
             responses: Mutex::new(HashMap::new()),
+            hists: Mutex::new(HashMap::new()),
             drained_until: Mutex::new(None),
             cut: watch::channel(0).0,
             h1,
@@ -757,6 +771,17 @@ impl Fleet {
         })
     }
 
+    /// Record `seconds` in histogram `what` ("queue": waiting for a slot; "request": body read to last byte sent),
+    /// labelled by pool and the upstream that served it.
+    pub fn time(&self, what: &'static str, pool: &str, upstream: &str, seconds: f64) {
+        self.hists
+            .lock()
+            .unwrap()
+            .entry((what, pool.to_string(), upstream.to_string()))
+            .or_default()
+            .observe(seconds);
+    }
+
     pub fn count(&self, pool: &str, code: u16) {
         let class = match code {
             0 => "none",
@@ -773,8 +798,11 @@ impl Fleet {
             .or_default() += 1;
     }
 
-    /// Weighted-random pick among the eligible pods with a free slot, taking the slot. `known` counts the eligible
-    /// pods at all, so the caller can tell "all full" (wait) from "none" (fail now).
+    /// The eligible pod with a free slot expected to finish this request soonest, taking the slot: the bytes queued on
+    /// it (this replica's, times the replicas, each queueing about as much) plus this request's, over its speed. Pass
+    /// time is linear in tokens and Kev states run 1k-12k tokens, so counting requests let two big ones share a 3090
+    /// while a 4090 idled (p95 1-2 s vs 0.4 s, 2026-10-23). ±10% jitter keeps replicas that see the same numbers from
+    /// herding. `known` counts the eligible pods at all, so the caller can tell "all full" (wait) from "none" (fail now).
     pub fn reserve(&self, w: &Want, tried: &HashSet<SocketAddr>) -> (Option<Arc<Pod>>, usize) {
         let now = Instant::now();
         let stall = self.stall();
@@ -790,20 +818,16 @@ impl Fleet {
             if tried.contains(&p.addr) {
                 continue;
             }
-            let score = p.score(&st, now, stall);
-            if score > 0.0 && st.held < self.room(p, &st) {
-                cands.push((score, p));
+            let speed = p.speed(&st, now, stall);
+            if speed > 0.0 && st.held < self.room(p, &st) {
+                let queued = st.held_cost * self.cfg.replicas.max(1) as f64;
+                let wait = (queued + w.cost) / speed;
+                cands.push((wait * (0.9 + 0.2 * rand::random::<f64>()), p));
             }
         }
-        while !cands.is_empty() {
-            let total: f64 = cands.iter().map(|c| c.0).sum();
-            let mut r = rand::random::<f64>() * total;
-            let i = cands.iter().position(|c| {
-                r -= c.0;
-                r <= 0.0
-            });
-            let (_, p) = cands.swap_remove(i.unwrap_or(cands.len() - 1));
-            if self.take(p) {
+        cands.sort_by(|a, b| a.0.total_cmp(&b.0));
+        for (_, p) in cands {
+            if self.take(p, w.cost) {
                 return (Some(p.clone()), known);
             }
         }
@@ -895,19 +919,25 @@ impl Fleet {
         }
     }
 
-    pub fn take(&self, p: &Arc<Pod>) -> bool {
+    pub fn take(&self, p: &Arc<Pod>, cost: f64) -> bool {
         let mut st = p.state.lock().unwrap();
         if st.held < self.room(p, &st) {
             st.held += 1;
+            st.held_cost += cost;
             true
         } else {
             false
         }
     }
 
-    pub fn release(&self, p: &Pod) {
+    pub fn release(&self, p: &Pod, cost: f64) {
         let mut st = p.state.lock().unwrap();
         st.held = st.held.saturating_sub(1);
+        st.held_cost = if st.held == 0 {
+            0.0
+        } else {
+            (st.held_cost - cost).max(0.0)
+        };
         drop(st);
         self.freed.notify_waiters();
     }
@@ -1179,7 +1209,10 @@ impl Fleet {
                 "inference_router_pod_weight",
                 "learned routing weight (gpu_multiplier until rates are measured)",
             ),
-            ("inference_router_pod_seed_weight", "configured gpu_multiplier"),
+            (
+                "inference_router_pod_seed_weight",
+                "configured gpu_multiplier",
+            ),
             (
                 "inference_router_pod_rate",
                 "busy-only service rate, tokens/s (0 = not measured)",
@@ -1269,7 +1302,61 @@ impl Fleet {
                 "inference_router_responses_total{{pool=\"{pool}\",status=\"{class}\"}} {n}"
             );
         }
+        let hists = self.hists.lock().unwrap();
+        for (what, help) in [
+            ("queue", "time waiting for a free slot on some pod"),
+            (
+                "request",
+                "body read to the last response byte, retries included",
+            ),
+        ] {
+            let name = format!("inference_router_{what}_seconds");
+            let _ = writeln!(out, "# HELP {name} {help}\n# TYPE {name} histogram");
+            for ((_, pool, upstream), h) in hists.iter().filter(|(k, _)| k.0 == what) {
+                h.render(
+                    &mut out,
+                    &name,
+                    &format!("pool=\"{pool}\",upstream=\"{upstream}\""),
+                );
+            }
+        }
         out
+    }
+}
+
+const BOUNDS: [f64; 14] = [
+    0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 180.0,
+];
+
+#[derive(Debug, Default)]
+pub struct Hist {
+    counts: [u64; BOUNDS.len()],
+    sum: f64,
+    count: u64,
+}
+
+impl Hist {
+    fn observe(&mut self, v: f64) {
+        if let Some(i) = BOUNDS.iter().position(|b| v <= *b) {
+            self.counts[i] += 1;
+        }
+        self.sum += v;
+        self.count += 1;
+    }
+
+    fn render(&self, out: &mut String, name: &str, labels: &str) {
+        use std::fmt::Write;
+        let mut cum = 0;
+        for (b, c) in BOUNDS.iter().zip(self.counts) {
+            cum += c;
+            let _ = writeln!(out, "{name}_bucket{{{labels},le=\"{b}\"}} {cum}");
+        }
+        let _ = writeln!(out, "{name}_bucket{{{labels},le=\"+Inf\"}} {}", self.count);
+        let _ = writeln!(
+            out,
+            "{name}_sum{{{labels}}} {}\n{name}_count{{{labels}}} {}",
+            self.sum, self.count
+        );
     }
 }
 
@@ -1396,6 +1483,40 @@ mod tests {
     }
 
     #[test]
+    fn reserve_picks_the_soonest_finish_by_bytes() {
+        let f = fleet(vec![
+            ("10.0.0.1:8008", up("3090", "kev", 10.0, 8), 0.0),
+            ("10.0.0.2:8008", up("4090", "kev", 16.0, 8), 0.0),
+        ]);
+        let none = HashSet::new();
+        let w = |cost| Want {
+            pool: "kev",
+            model: None,
+            needs_image: false,
+            cost,
+        };
+        let big = f.reserve(&w(12_000.0), &none).0.unwrap();
+        assert_eq!(big.up.name, "4090", "idle fleet: the faster card");
+        // 4090: (12k + 1k) / 16 = 812 vs 3090: 1k / 10 = 100, jitter ±10% can't flip it
+        assert_eq!(
+            f.reserve(&w(1_000.0), &none).0.unwrap().up.name,
+            "3090",
+            "a big request queued on the 4090 sends the next to the idle 3090"
+        );
+        f.release(&big, 12_000.0);
+        assert_eq!(big.state.lock().unwrap().held_cost, 0.0);
+
+        let mut h = Hist::default();
+        h.observe(0.2);
+        h.observe(3.0);
+        let mut out = String::new();
+        h.render(&mut out, "x", "pool=\"kev\"");
+        assert!(out.contains("x_bucket{pool=\"kev\",le=\"0.25\"} 1\n"));
+        assert!(out.contains("x_bucket{pool=\"kev\",le=\"5\"} 2\n"));
+        assert!(out.contains("x_count{pool=\"kev\"} 2\n"));
+    }
+
+    #[test]
     fn pools_caps_and_weights() {
         let f = fleet(vec![
             ("10.0.0.1:8000", up("chat", "default", 10.0, 2), 0.0),
@@ -1408,6 +1529,7 @@ mod tests {
                     pool: "kev",
                     model: None,
                     needs_image: false,
+                    cost: 0.0,
                 },
                 &none,
             );
@@ -1422,6 +1544,7 @@ mod tests {
                 pool: "kev",
                 model: None,
                 needs_image: false,
+                cost: 0.0,
             },
             &none,
         );
@@ -1434,18 +1557,20 @@ mod tests {
                 pool: "nope",
                 model: None,
                 needs_image: false,
+                cost: 0.0,
             },
             &none,
         );
         assert_eq!(known, 0, "no pod of the pool: fail fast");
         let kev = f.pods.read().unwrap()[1].clone();
-        f.release(&kev);
+        f.release(&kev, 0.0);
         assert!(
             f.reserve(
                 &Want {
                     pool: "kev",
                     model: None,
-                    needs_image: false
+                    needs_image: false,
+                    cost: 0.0
                 },
                 &none
             )
@@ -1459,7 +1584,8 @@ mod tests {
                 &Want {
                     pool: "kev",
                     model: None,
-                    needs_image: false
+                    needs_image: false,
+                    cost: 0.0
                 },
                 &tried
             )
@@ -1502,11 +1628,13 @@ mod tests {
             f.has_text_only(&Want {
                 pool: "default",
                 model: None,
-                needs_image: false
+                needs_image: false,
+                cost: 0.0
             }) && !f.has_text_only(&Want {
                 pool: "kev",
                 model: None,
-                needs_image: false
+                needs_image: false,
+                cost: 0.0
             })
         );
         for _ in 0..4 {
@@ -1515,7 +1643,8 @@ mod tests {
                     &Want {
                         pool: "default",
                         model: None,
-                        needs_image: true
+                        needs_image: true,
+                        cost: 0.0
                     },
                     &HashSet::new()
                 )
@@ -1531,6 +1660,7 @@ mod tests {
                 pool: "default",
                 model: None,
                 needs_image: true,
+                cost: 0.0,
             },
             &HashSet::new(),
         );
@@ -1544,7 +1674,8 @@ mod tests {
                     &Want {
                         pool: "default",
                         model: None,
-                        needs_image: true
+                        needs_image: true,
+                        cost: 0.0
                     },
                     &format!("s{i}")
                 )
@@ -1568,6 +1699,7 @@ mod tests {
                     pool: "default",
                     model: None,
                     needs_image: false,
+                    cost: 0.0,
                 },
                 "sess-1",
             )
@@ -1577,7 +1709,8 @@ mod tests {
                 &Want {
                     pool: "default",
                     model: None,
-                    needs_image: false
+                    needs_image: false,
+                    cost: 0.0
                 },
                 "sess-1"
             )
@@ -1592,7 +1725,8 @@ mod tests {
                 &Want {
                     pool: "default",
                     model: None,
-                    needs_image: false
+                    needs_image: false,
+                    cost: 0.0
                 }
             ),
             "equal pods: hold the prefix"
@@ -1610,7 +1744,8 @@ mod tests {
                 &Want {
                     pool: "default",
                     model: None,
-                    needs_image: false
+                    needs_image: false,
+                    cost: 0.0
                 }
             ),
             "a jammed home spills to a clearly idler sibling"
@@ -1621,7 +1756,8 @@ mod tests {
                 &Want {
                     pool: "default",
                     model: None,
-                    needs_image: false
+                    needs_image: false,
+                    cost: 0.0
                 },
                 "sess-1"
             )
@@ -1740,6 +1876,7 @@ mod tests {
                 pool: "default",
                 model: Some("lora-a"),
                 needs_image: false,
+                cost: 0.0,
             };
             assert_eq!(
                 f.reserve(&w, &none).0.unwrap().up.name,
@@ -1752,6 +1889,7 @@ mod tests {
             pool: "kev",
             model: Some("combo-r3"),
             needs_image: false,
+            cost: 0.0,
         };
         assert_eq!(f.reserve(&w, &none).0.unwrap().up.name, "combo");
         assert!(
@@ -1772,7 +1910,8 @@ mod tests {
 
     #[test]
     fn zstd_waits_for_the_box_to_hold_our_dictionary() {
-        let dir = std::env::temp_dir().join(format!("inference_router_rs-test-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("inference_router_rs-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("d.zdict");
         let train = |w: &str| {
