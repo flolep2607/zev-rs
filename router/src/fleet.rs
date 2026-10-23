@@ -606,7 +606,7 @@ pub struct Fleet {
     pub train: Option<Arc<crate::train::Trainer>>,
     kube: Option<Arc<crate::kube::Kube>>,
     /// Pod IP -> (node, GPU model), from the Kubernetes API every minute; shown, never used to route.
-    placement: RwLock<HashMap<IpAddr, (String, Option<String>)>>,
+    placement: RwLock<HashMap<IpAddr, crate::kube::Placement>>,
 }
 
 /// A dead node blackholes SYN rather than refusing it; the default would be a long wait before failover starts.
@@ -1177,7 +1177,7 @@ impl Fleet {
                     "weight": st.weight, "seed_weight": p.up.gpu_multiplier, "rate": st.rate.map(|r| r.0),
                     "limit": st.limit, "room": self.room(p, &st),
                     "latency_s": st.latency.map(|l| l.0), "latency_baseline_s": st.latency.map(|l| l.1),
-                    "node": place.get(&p.addr.ip()).map(|x| &x.0), "gpu": place.get(&p.addr.ip()).and_then(|x| x.1.as_ref()),
+                    "placement": place.get(&p.addr.ip()),
                 })
             })
             .collect();
@@ -1295,13 +1295,13 @@ impl Fleet {
             }
         }
         let place = self.placement.read().unwrap();
-        let _ = writeln!(out, "# HELP inference_router_pod_info 1 per pod with its node and GPU model from the Kubernetes API\n# TYPE inference_router_pod_info gauge");
+        let _ = writeln!(out, "# HELP inference_router_pod_info 1 per pod with its node, GPU, pod name and image tag from the Kubernetes API\n# TYPE inference_router_pod_info gauge");
         for p in pods.iter() {
-            if let Some((node, gpu)) = place.get(&p.addr.ip()) {
+            if let Some(pl) = place.get(&p.addr.ip()) {
                 let _ = writeln!(
                     out,
-                    "inference_router_pod_info{{pool=\"{}\",upstream=\"{}\",pod=\"{}\",node=\"{node}\",gpu=\"{}\"}} 1",
-                    p.up.pool, p.up.name, p.addr, gpu.as_deref().unwrap_or("")
+                    "inference_router_pod_info{{pool=\"{}\",upstream=\"{}\",pod=\"{}\",node=\"{}\",gpu=\"{}\",name=\"{}\",version=\"{}\"}} 1",
+                    p.up.pool, p.up.name, p.addr, pl.node, pl.gpu.as_deref().unwrap_or(""), pl.name, pl.version
                 );
             }
         }

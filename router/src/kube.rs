@@ -167,9 +167,9 @@ impl Kube {
         }
     }
 
-    /// Pod IP -> (node, GPU model from the node's nvidia.com/gpu.product label), for the pods of this namespace. Needs
-    /// `list pods` here and `get nodes`; without them, or for a rented box, nothing is shown.
-    pub async fn placement(&self) -> Result<HashMap<IpAddr, (String, Option<String>)>, String> {
+    /// Pod IP -> where and what it runs, for the pods of this namespace. Needs `list pods` here and `get nodes`;
+    /// without them, or for a rented box, nothing is shown.
+    pub async fn placement(&self) -> Result<HashMap<IpAddr, Placement>, String> {
         let get = |path: String| async move {
             let r = self
                 .req(reqwest::Method::GET, &path)
@@ -200,14 +200,66 @@ impl Kube {
                     .await
                     .ok()
                     .and_then(|n| {
-                        n["metadata"]["labels"]["nvidia.com/gpu.product"]
+                        let l = &n["metadata"]["labels"];
+                        // GPU feature discovery's product name, else the device-plugin config ("3090-config")
+                        l["nvidia.com/gpu.product"]
                             .as_str()
                             .map(str::to_string)
+                            .or_else(|| {
+                                l["nvidia.com/device-plugin.config"]
+                                    .as_str()
+                                    .map(|c| c.trim_end_matches("-config").to_string())
+                            })
                     });
                 gpus.insert(node.to_string(), gpu);
             }
-            out.insert(ip, (node.to_string(), gpus[node].clone()));
+            let image = p["spec"]["containers"][0]["image"].as_str().unwrap_or("");
+            out.insert(
+                ip,
+                Placement {
+                    node: node.to_string(),
+                    gpu: gpus[node].clone(),
+                    name: p["metadata"]["name"].as_str().unwrap_or("").to_string(),
+                    version: image_tag(image).to_string(),
+                },
+            );
         }
         Ok(out)
+    }
+}
+
+/// Where a pod runs and what it runs, from the Kubernetes API; shown in /metrics, never used to route.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Placement {
+    pub node: String,
+    pub gpu: Option<String>,
+    /// The pod's name.
+    pub name: String,
+    /// Its first container's image tag (zev-fast:87e7f23 -> "87e7f23").
+    pub version: String,
+}
+
+/// `registry:5000/repo:tag@sha256:...` -> "tag"; no tag -> "".
+fn image_tag(image: &str) -> &str {
+    let image = image.split('@').next().unwrap_or(image);
+    match image.rsplit_once(':') {
+        Some((repo, tag)) if !tag.contains('/') && !repo.is_empty() => tag,
+        _ => "",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::image_tag;
+
+    #[test]
+    fn image_tags() {
+        assert_eq!(image_tag("ghcr.io/flolep2607/zev-fast:87e7f23"), "87e7f23");
+        assert_eq!(
+            image_tag("172.17.16.214:5000/zev-router:3a726ae"),
+            "3a726ae"
+        );
+        assert_eq!(image_tag("172.17.16.214:5000/zev-router"), "");
+        assert_eq!(image_tag("repo/x:1.2@sha256:abc"), "1.2");
     }
 }
