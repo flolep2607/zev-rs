@@ -57,6 +57,31 @@ struct Layer {
     lora: [Option<Lora>; 4], // unmerged adapter of: the mixer's input projection, its output, gate_up, down
 }
 
+impl Layer {
+    /// The adapter modules each projection is made of, in `lora`'s order: mixer input, mixer output, gate_up, down.
+    /// Layer `i`'s names as the base checkpoint spells them below `layers.`.
+    fn lora_groups(&self, i: usize) -> [Vec<String>; 4] {
+        let p = format!("layers.{i}");
+        let mods = |names: &[&str], under: &str| -> Vec<String> { names.iter().map(|n| format!("{p}.{under}.{n}")).collect() };
+        let (input, output) = match &self.mixer {
+            Mixer::Gdn(_) => (
+                mods(&["in_proj_qkv", "in_proj_z", "in_proj_b", "in_proj_a"], "linear_attn"),
+                mods(&["out_proj"], "linear_attn"),
+            ),
+            Mixer::Attn(_) => (mods(&["q_proj", "k_proj", "v_proj"], "self_attn"), mods(&["o_proj"], "self_attn")),
+        };
+        [input, output, mods(&["gate_proj", "up_proj"], "mlp"), mods(&["down_proj"], "mlp")]
+    }
+    /// The projections in `lora_groups` order.
+    fn projs_mut(&mut self) -> [&mut Proj; 4] {
+        let (input, output) = match &mut self.mixer {
+            Mixer::Gdn(g) => (&mut g.proj, &mut g.out),
+            Mixer::Attn(a) => (&mut a.qkv, &mut a.o),
+        };
+        [input, output, &mut self.gate_up, &mut self.down]
+    }
+}
+
 /// An unmerged LoRA of one (possibly concatenated) projection: A [rank * modules, in], B [out, rank * modules]
 /// block-diagonal with the scale folded in, both in the model dtype.
 #[derive(Clone)]
@@ -125,6 +150,14 @@ pub enum Proj {
         inn: usize,
         mode: i32,
     },
+}
+
+/// int8 weights q [out, in] (the bytes of two's-complement values, as `quant_rows` writes them) times their per-row
+/// scales s [out], as f32.
+fn dequant_int8(q: &Tensor, s: &Tensor) -> Result<Tensor> {
+    let q = q.to_dtype(DType::F32)?;
+    let wrapped = q.ge(127.5)?.to_dtype(DType::F32)?; // bytes 128..=255 are -128..=-1
+    (q - (wrapped * 256.0)?)?.broadcast_mul(&s.unsqueeze(1)?)
 }
 
 /// A projection's input: bf16, or int8 rows with one scale each, written so by the kernel that produced them
@@ -207,6 +240,21 @@ impl Proj {
             mode,
         };
         Ok(true)
+    }
+    /// This weight plus `delta` [out, in] f32, in place: a dense weight is rounded back to its dtype, a KEV_W8=int8 one
+    /// is dequantized, summed in f32, rounded to bf16 as a fresh merge rounds, and quantized again (the kernel that
+    /// quantizes a freshly merged weight). The old tensors are freed once no other model holds them.
+    fn add_delta(&mut self, delta: &Tensor) -> Result<()> {
+        match self {
+            Proj::Dense(w) => *w = (w.to_dtype(DType::F32)? + delta)?.to_dtype(w.dtype())?,
+            Proj::W8 { q, s, mode: 1, .. } => {
+                let w = ((dequant_int8(q, s)? + delta)?).to_dtype(DType::BF16)?;
+                (*q, *s) = kernels::quant_rows(&w, 1)?;
+            }
+            Proj::W8 { mode, .. } => candle_core::bail!("remerge supports bf16 and KEV_W8=int8 weights, not mode {mode}"),
+            Proj::Q8 { .. } => candle_core::bail!("remerge does not support GGUF Q8_0 weights"),
+        }
+        Ok(())
     }
     /// Rows `ids` of the weight in `dt` (an embedding lookup, label rows).
     pub fn rows_at(&self, ids: &[u32], dt: DType) -> Result<Tensor> {
@@ -460,9 +508,21 @@ impl Loader {
         pair_in(&self.lora.as_ref()?.0, module)
     }
     /// The unmerged LoRA of a projection made of `modules` concatenated in this order (as `linear` concatenates them),
-    /// minus the merged adapter's (`minus`), or None when neither touches them. A module the base lacks (a Gemma 4
-    /// global layer's v_proj) is skipped, as `linear` never built it.
+    /// minus the merged adapter's (`minus`), or None when neither touches them.
     fn adapter(&self, modules: &[String]) -> Result<Option<Lora>> {
+        Ok(match self.factors(modules)? {
+            Some((a, b)) => Some(Lora {
+                a: a.to_dtype(self.dt)?,
+                b: b.to_dtype(self.dt)?,
+                aq: None,
+            }),
+            None => None,
+        })
+    }
+    /// `adapter`'s factors in f32: A [rank * modules, in] and the scaled, block-diagonal B [out, rank * modules], so
+    /// B @ A is this adapter's delta of the concatenated projection minus the `minus` adapter's. A module the base
+    /// lacks (a Gemma 4 global layer's v_proj) is skipped, as `linear` never built it.
+    fn factors(&self, modules: &[String]) -> Result<Option<(Tensor, Tensor)>> {
         let Source::St(base) = &self.base else {
             candle_core::bail!("an unmerged adapter needs a safetensors base");
         };
@@ -500,11 +560,7 @@ impl Loader {
             row.push(z(rank - col)?);
             rows.push(Tensor::cat(&row, 1)?);
         }
-        Ok(Some(Lora {
-            a: a.to_dtype(self.dt)?,
-            b: Tensor::cat(&rows, 0)?.to_dtype(self.dt)?,
-            aq: None,
-        }))
+        Ok(Some((a, Tensor::cat(&rows, 0)?)))
     }
 }
 
@@ -742,20 +798,7 @@ impl Model {
             if dt != DType::BF16 {
                 candle_core::bail!("KEV_W8 needs --dtype bf16");
             }
-            let (mut done, mut kept) = (0, 0);
-            for l in &mut m.layers {
-                let projs: Vec<&mut Proj> = match &mut l.mixer {
-                    Mixer::Gdn(g) => vec![&mut g.proj, &mut g.out, &mut l.gate_up, &mut l.down],
-                    Mixer::Attn(a) => vec![&mut a.qkv, &mut a.o, &mut l.gate_up, &mut l.down],
-                };
-                for p in projs {
-                    if p.quantize_w8(mode)? {
-                        done += 1
-                    } else {
-                        kept += 1
-                    }
-                }
-            }
+            let (done, kept) = m.quantize_w8(mode)?;
             eprintln!(
                 "kev: KEV_W8={} on {done} projections ({kept} kept bf16)",
                 ["fp8", "int8", "fp8t"][mode as usize]
@@ -779,26 +822,8 @@ impl Model {
         ld.minus = merged.map(open_adapter).transpose()?;
         let mut m = self.clone();
         for (i, l) in m.layers.iter_mut().enumerate() {
-            let p = format!("layers.{i}");
-            let mods = |names: &[&str], under: &str| -> Vec<String> {
-                names.iter().map(|n| format!("{p}.{under}.{n}")).collect()
-            };
-            let (input, output) = match &l.mixer {
-                Mixer::Gdn(_) => (
-                    mods(&["in_proj_qkv", "in_proj_z", "in_proj_b", "in_proj_a"], "linear_attn"),
-                    mods(&["out_proj"], "linear_attn"),
-                ),
-                Mixer::Attn(_) => (
-                    mods(&["q_proj", "k_proj", "v_proj"], "self_attn"),
-                    mods(&["o_proj"], "self_attn"),
-                ),
-            };
-            l.lora = [
-                ld.adapter(&input)?,
-                ld.adapter(&output)?,
-                ld.adapter(&mods(&["gate_proj", "up_proj"], "mlp"))?,
-                ld.adapter(&mods(&["down_proj"], "mlp"))?,
-            ];
+            let [input, output, gate_up, down] = l.lora_groups(i);
+            l.lora = [ld.adapter(&input)?, ld.adapter(&output)?, ld.adapter(&gate_up)?, ld.adapter(&down)?];
         }
         let n = ld.finish()?;
         // KEV_W8=int8: give every LoRA an int8 down-projection, so the projections keep their fused int8 rows
@@ -817,6 +842,48 @@ impl Model {
             adapter_dir.display(),
             if merged.is_some() { ", minus the merged adapter" } else { "" }
         );
+        Ok(m)
+    }
+
+    /// Re-encode every layer projection as W8 (`Proj::quantize_w8`); -> (converted, kept dense).
+    fn quantize_w8(&mut self, mode: i32) -> Result<(usize, usize)> {
+        let (mut done, mut kept) = (0, 0);
+        for p in self.layers.iter_mut().flat_map(|l| l.projs_mut()) {
+            if p.quantize_w8(mode)? {
+                done += 1
+            } else {
+                kept += 1
+            }
+        }
+        Ok((done, kept))
+    }
+
+    /// This merged backbone (adapter `from` folded in) turned into the one with `to` folded in, on its own device:
+    /// each projection a LoRA touches becomes W - delta_from + delta_to (delta = scale * B @ A in f32, the fused
+    /// qkv / gate_up deltas stacked row-wise exactly as `linear` stacks the weights), re-quantized when it is W8.
+    /// Everything else (embeddings, head, norms, conv, projections neither adapter touches) is shared with `self`; the
+    /// result holds no unmerged LoRA branch. `base_dir` is the checkpoint `self` was loaded from (its tensor names
+    /// and shapes locate the adapter pairs). Costs the memory of the replaced projections, plus one f32 projection
+    /// of transient.
+    ///
+    /// Not bit-exact against a fresh merge: `self`'s weights were rounded to the model dtype (and to int8) once
+    /// already, and that error carries over. It is the weight error `Model::load(base, to)` would make, again.
+    pub fn remerge(&self, base_dir: &Path, from: &Path, to: &Path) -> Result<Self> {
+        if self.unmerged || self.layers.iter().any(|l| l.lora.iter().any(Option::is_some)) {
+            candle_core::bail!("remerge needs a merged backbone, one with no unmerged adapter attached");
+        }
+        let mut ld = Loader::new(base_dir, Some(to), self.dt, &self.dev)?;
+        ld.minus = Some(open_adapter(from)?);
+        let mut m = self.clone();
+        for (i, l) in m.layers.iter_mut().enumerate() {
+            let groups = l.lora_groups(i);
+            for (p, modules) in l.projs_mut().into_iter().zip(&groups) {
+                if let Some((a, b)) = ld.factors(modules)? {
+                    p.add_delta(&b.matmul(&a)?)?;
+                }
+            }
+        }
+        ld.finish()?;
         Ok(m)
     }
 
@@ -1381,4 +1448,186 @@ enum Family {
     Qwen3,
     Gemma3,
     Gemma4,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
+    /// Every adapter-targetable projection of the tiny checkpoint: (module, out, in). Layer 0 is a DeltaNet layer
+    /// (4 fused input projections), layer 1 full attention (fused q, k, v); both have gate/up (fused) and down.
+    const MODULES: [(&str, usize, usize); 14] = [
+        ("layers.0.linear_attn.in_proj_qkv", 3072, 32),
+        ("layers.0.linear_attn.in_proj_z", 1024, 32),
+        ("layers.0.linear_attn.in_proj_b", 8, 32),
+        ("layers.0.linear_attn.in_proj_a", 8, 32),
+        ("layers.0.linear_attn.out_proj", 32, 1024),
+        ("layers.1.self_attn.q_proj", 64, 32),
+        ("layers.1.self_attn.k_proj", 16, 32),
+        ("layers.1.self_attn.v_proj", 16, 32),
+        ("layers.1.self_attn.o_proj", 32, 32),
+        ("layers.0.mlp.gate_proj", 48, 32),
+        ("layers.0.mlp.up_proj", 48, 32),
+        ("layers.0.mlp.down_proj", 32, 48),
+        ("layers.1.mlp.gate_proj", 48, 32),
+        ("layers.1.mlp.up_proj", 48, 32),
+    ];
+    const DOWN1: (&str, usize, usize) = ("layers.1.mlp.down_proj", 32, 48);
+
+    struct Rng(u64);
+    impl Rng {
+        /// Uniform in [-0.5, 0.5).
+        fn tensor(&mut self, shape: &[usize]) -> Tensor {
+            let n: usize = shape.iter().product();
+            let v: Vec<f32> = (0..n)
+                .map(|_| {
+                    self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                    (self.0 >> 40) as f32 / (1u64 << 24) as f32 - 0.5
+                })
+                .collect();
+            Tensor::from_vec(v, shape.to_vec(), &Device::Cpu).unwrap()
+        }
+    }
+
+    fn save(map: HashMap<String, Tensor>, path: PathBuf) {
+        candle_core::safetensors::save(&map, path).unwrap();
+    }
+
+    /// A tiny Qwen3.5 checkpoint (DeltaNet layer, then full-attention layer) and two adapters over it: `x` lacks the
+    /// DeltaNet b/a and v_proj modules, `y` lacks them and k_proj, so fused projections see adapters of different
+    /// shapes. -> (base, x, y).
+    fn fixture(name: &str) -> (PathBuf, PathBuf, PathBuf) {
+        let root = std::env::temp_dir().join(format!("zev_remerge_{name}_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let mut rng = Rng(7);
+        let base = root.join("base");
+        std::fs::create_dir_all(&base).unwrap();
+        std::fs::write(
+            base.join("config.json"),
+            r#"{"model_type": "qwen3_5_text", "hidden_size": 32, "num_attention_heads": 2, "num_key_value_heads": 1, "head_dim": 16,
+                "linear_num_key_heads": 8, "linear_num_value_heads": 8, "linear_key_head_dim": 128, "linear_value_head_dim": 128,
+                "linear_conv_kernel_dim": 4, "layer_types": ["linear_attention", "full_attention"], "rms_norm_eps": 1e-6}"#,
+        )
+        .unwrap();
+        let mut t: HashMap<String, Tensor> = HashMap::new();
+        for (m, out, inn) in MODULES.iter().chain([&DOWN1]) {
+            t.insert(format!("model.{m}.weight"), rng.tensor(&[*out, *inn]));
+        }
+        for (n, shape) in [
+            ("embed_tokens.weight", vec![40, 32]),
+            ("norm.weight", vec![32]),
+            ("layers.0.linear_attn.conv1d.weight", vec![3072, 1, 4]),
+            ("layers.0.linear_attn.A_log", vec![8]),
+            ("layers.0.linear_attn.dt_bias", vec![8]),
+            ("layers.0.linear_attn.norm.weight", vec![128]),
+            ("layers.1.self_attn.q_norm.weight", vec![16]),
+            ("layers.1.self_attn.k_norm.weight", vec![16]),
+        ] {
+            t.insert(format!("model.{n}"), rng.tensor(&shape));
+        }
+        for l in 0..2 {
+            for n in ["input_layernorm", "post_attention_layernorm"] {
+                t.insert(format!("model.layers.{l}.{n}.weight"), rng.tensor(&[32]));
+            }
+        }
+        save(t, base.join("model.safetensors"));
+        let adapter = |dir: &str, seed: u64, skip: &[&str]| {
+            let d = root.join(dir);
+            std::fs::create_dir_all(&d).unwrap();
+            std::fs::write(d.join("adapter_config.json"), r#"{"r": 4, "lora_alpha": 8}"#).unwrap();
+            let mut rng = Rng(seed);
+            let mut t = HashMap::new();
+            for (m, out, inn) in MODULES.iter().chain([&DOWN1]).filter(|(m, _, _)| !skip.iter().any(|s| m.ends_with(s))) {
+                t.insert(format!("base_model.model.model.{m}.lora_A.weight"), rng.tensor(&[4, *inn]));
+                t.insert(format!("base_model.model.model.{m}.lora_B.weight"), rng.tensor(&[*out, 4]));
+            }
+            save(t, d.join("adapter_model.safetensors"));
+            d
+        };
+        let x = adapter("x", 11, &["in_proj_b", "in_proj_a", "v_proj"]);
+        let y = adapter("y", 13, &["in_proj_b", "in_proj_a", "k_proj"]);
+        (base, x, y)
+    }
+
+    /// Each layer projection as f32 (W8 dequantized) with its row scales.
+    fn weights(m: &Model) -> Vec<(Tensor, Option<Tensor>)> {
+        m.clone()
+            .layers
+            .iter_mut()
+            .flat_map(|l| l.projs_mut())
+            .map(|p| match p {
+                Proj::Dense(w) => (w.to_dtype(DType::F32).unwrap(), None),
+                Proj::W8 { q, s, .. } => (dequant_int8(q, s).unwrap(), Some(s.clone())),
+                Proj::Q8 { .. } => unreachable!(),
+            })
+            .collect()
+    }
+
+    fn max_abs(a: &Tensor, b: &Tensor) -> f32 {
+        (a - b).unwrap().abs().unwrap().max_all().unwrap().to_scalar::<f32>().unwrap()
+    }
+
+    /// Largest |a - b| over all projections.
+    fn drift(a: &Model, b: &Model) -> f32 {
+        weights(a).iter().zip(weights(b)).map(|((x, _), (y, _))| max_abs(x, &y)).fold(0.0, f32::max)
+    }
+
+    /// Every element of every projection of `a` is within (the row scales of a, b, c) / 2 + `slack` of `b`'s.
+    fn assert_within_quantization(a: &Model, b: &Model, c: &Model, slack: f32) {
+        let (wa, wb, wc) = (weights(a), weights(b), weights(c));
+        for ((a, b), c) in wa.iter().zip(&wb).zip(&wc) {
+            let (Some(sa), Some(sb), Some(sc)) = (&a.1, &b.1, &c.1) else { panic!("a projection stayed dense") };
+            let tol = ((((sa + sb).unwrap() + sc).unwrap() * 0.5).unwrap() + slack as f64).unwrap().unsqueeze(1).unwrap();
+            let over = (&a.0 - &b.0).unwrap().abs().unwrap().broadcast_sub(&tol).unwrap().max_all().unwrap().to_scalar::<f32>().unwrap();
+            assert!(over <= 0.0, "a weight is {over} past its quantization tolerance");
+        }
+    }
+
+    #[test]
+    fn remerge_dense_equals_a_fresh_merge() {
+        let (base, x, y) = fixture("dense");
+        let cpu = Device::Cpu;
+        let (mx, my) = (Model::load(&base, Some(&x), DType::F32, &cpu).unwrap(), Model::load(&base, Some(&y), DType::F32, &cpu).unwrap());
+        assert!(drift(&mx, &my) > 0.1, "the adapters must differ for this test to mean anything");
+        let r = mx.remerge(&base, &x, &y).unwrap();
+        assert!(r.layers.iter().all(|l| l.lora.iter().all(Option::is_none)));
+        let d = drift(&r, &my);
+        assert!(d < 1e-6, "remerge X->Y is {d} from a fresh merge of Y");
+        let back = r.remerge(&base, &y, &x).unwrap();
+        let d = drift(&back, &mx);
+        assert!(d < 1e-6, "X->Y->X is {d} from X");
+        // what neither adapter touches is the same tensor, not a copy
+        assert_eq!(r.norm.to_vec1::<f32>().unwrap(), mx.norm.to_vec1::<f32>().unwrap());
+        let _ = std::fs::remove_dir_all(base.parent().unwrap());
+    }
+
+    #[test]
+    fn remerge_w8_stays_within_quantization_error() {
+        let (base, x, y) = fixture("w8");
+        let cpu = Device::Cpu;
+        let load = |a: &Path| {
+            let mut m = Model::load(&base, Some(a), DType::BF16, &cpu).unwrap();
+            let (done, kept) = m.quantize_w8(1).unwrap();
+            assert_eq!((done, kept), (m.layers.len() * 4, 0));
+            m
+        };
+        let (mx, my) = (load(&x), load(&y));
+        assert!(drift(&mx, &my) > 0.1, "the adapters must differ for this test to mean anything");
+        let r = mx.remerge(&base, &x, &y).unwrap();
+        // X's error, Y's, and the new one: three roundings, each at most half a quantization step (+ bf16's)
+        assert_within_quantization(&r, &my, &mx, 0.02);
+        let back = r.remerge(&base, &y, &x).unwrap();
+        assert_within_quantization(&back, &mx, &my, 0.03);
+        let _ = std::fs::remove_dir_all(base.parent().unwrap());
+    }
+
+    #[test]
+    fn remerge_refuses_an_unmerged_model() {
+        let (base, x, y) = fixture("refuse");
+        let m = Model::load(&base, None, DType::F32, &Device::Cpu).unwrap().with_adapter(&base, &x, None).unwrap();
+        assert!(m.remerge(&base, &x, &y).is_err());
+        let _ = std::fs::remove_dir_all(base.parent().unwrap());
+    }
 }

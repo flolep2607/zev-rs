@@ -892,6 +892,20 @@ pub fn quant_rows(x: &Tensor, mode: i32) -> Result<(Tensor, Tensor)> {
     if is_cuda(x) {
         return cu::quant_rows(x, mode);
     }
+    // unit tests only: the int8 rounding of quant_rows_bf16 on the host, so the remerge math runs without a GPU
+    #[cfg(test)]
+    if mode == 1 {
+        let (r, k) = x.dims2()?;
+        let v = x.to_dtype(DType::F32)?.flatten_all()?.to_vec1::<f32>()?;
+        let (mut q, mut s) = (Vec::with_capacity(r * k), Vec::with_capacity(r));
+        for row in v.chunks(k) {
+            let amax = row.iter().fold(0f32, |m, x| m.max(x.abs()));
+            let sc = if amax > 0.0 { amax / 127.0 } else { 1.0 };
+            s.push(sc);
+            q.extend(row.iter().map(|x| (x * (1.0 / sc)).round_ties_even().clamp(-127.0, 127.0) as i8 as u8));
+        }
+        return Ok((Tensor::from_vec(q, (r, k), x.device())?, Tensor::from_vec(s, r, x.device())?));
+    }
     let _ = (x, mode);
     candle_core::bail!("KEV_W8 needs a CUDA device")
 }
