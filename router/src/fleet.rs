@@ -330,6 +330,8 @@ pub struct ModelInfo {
     pub id: String,
     pub parent: Option<String>,
     pub max_len: Option<u64>,
+    /// zev only: false when the adapter runs as an unmerged delta on a shared base, so slower. None = unknown or n/a.
+    pub merged: Option<bool>,
 }
 
 /// Either dialect of /v1/models: OpenAI's `{"data":[{"id","parent","max_model_len"}]}` (vLLM) or zev's
@@ -345,6 +347,7 @@ pub fn parse_models(json: &str) -> Option<Vec<ModelInfo>> {
                         id: s(e, "id")?,
                         parent: s(e, "parent"),
                         max_len: e.get("max_model_len").and_then(|x| x.as_u64()),
+                        merged: None,
                     })
                 })
                 .collect(),
@@ -359,6 +362,7 @@ pub fn parse_models(json: &str) -> Option<Vec<ModelInfo>> {
                     id: s(e, "name")?,
                     parent: None,
                     max_len: None,
+                    merged: e.get("merged").and_then(|x| x.as_bool()),
                 })
             })
             .collect(),
@@ -408,6 +412,9 @@ const STALE_PENALTY_AFTER: Duration = Duration::from_secs(15);
 const FAIL_FOR: Duration = Duration::from_secs(30);
 const FAIL_PENALTY: f64 = 0.05; // soft, not a skip: a fleet-wide blip must not empty the list
 const KV_CLIFF: f64 = 0.95;
+/// A zev pod serving the requested adapter unmerged is this much slower than one serving it merged: measured 3.4x
+/// (kev-4b pass 0.554 s vs 0.165 s, 2026-10-23).
+const UNMERGED_SLOWDOWN: f64 = 3.0;
 /// How long a model name stays "known" after the last pod listing it went away: a request for it then fails fast
 /// instead of falling back to a pod that would answer with another adapter (zev answers any name with its own).
 const MODEL_MEMORY: Duration = Duration::from_secs(3600);
@@ -802,7 +809,8 @@ impl Fleet {
     /// it (this replica's, times the replicas, each queueing about as much) plus this request's, over its speed. Pass
     /// time is linear in tokens and Kev states run 1k-12k tokens, so counting requests let two big ones share a 3090
     /// while a 4090 idled (p95 1-2 s vs 0.4 s, 2026-10-23). ±10% jitter keeps replicas that see the same numbers from
-    /// herding. `known` counts the eligible pods at all, so the caller can tell "all full" (wait) from "none" (fail now).
+    /// herding. A pod serving the requested model unmerged (`ModelInfo::merged`) counts as UNMERGED_SLOWDOWN times slower,
+    /// so a model's merged pods win until they are busy and it spills to the rest. `known` counts the eligible pods at all, so the caller can tell "all full" (wait) from "none" (fail now).
     pub fn reserve(&self, w: &Want, tried: &HashSet<SocketAddr>) -> (Option<Arc<Pod>>, usize) {
         let now = Instant::now();
         let stall = self.stall();
@@ -818,7 +826,15 @@ impl Fleet {
             if tried.contains(&p.addr) {
                 continue;
             }
-            let speed = p.speed(&st, now, stall);
+            let mut speed = p.speed(&st, now, stall);
+            let unmerged = |m: &str| {
+                st.models
+                    .iter()
+                    .any(|x| x.id == m && x.merged == Some(false))
+            };
+            if w.model.is_some_and(unmerged) {
+                speed /= UNMERGED_SLOWDOWN;
+            }
             if speed > 0.0 && st.held < self.room(p, &st) {
                 let queued = st.held_cost * self.cfg.replicas.max(1) as f64;
                 let wait = (queued + w.cost) / speed;
@@ -1517,6 +1533,36 @@ mod tests {
     }
 
     #[test]
+    fn reserve_prefers_the_pod_where_the_model_is_merged() {
+        let f = fleet(vec![
+            ("10.0.0.1:8008", up("merged", "kev", 10.0, 8), 0.0),
+            ("10.0.0.2:8008", up("unmerged", "kev", 16.0, 8), 0.0),
+        ]);
+        for (i, merged) in [(0, true), (1, false)] {
+            let p = f.pods.read().unwrap()[i].clone();
+            p.state.lock().unwrap().models = vec![ModelInfo {
+                id: "kev-4b".into(),
+                parent: None,
+                max_len: None,
+                merged: Some(merged),
+            }];
+        }
+        let w = Want {
+            pool: "kev",
+            model: Some("kev-4b"),
+            needs_image: false,
+            cost: 1_000.0,
+        };
+        // merged: 1000 / 10 = 100; unmerged: 1000 / (16 / 3) = 187, jitter ±10% can't flip it
+        let (p, _) = f.reserve(&w, &HashSet::new());
+        assert_eq!(
+            p.unwrap().up.name,
+            "merged",
+            "the slower card, but the adapter is merged there"
+        );
+    }
+
+    #[test]
     fn pools_caps_and_weights() {
         let f = fleet(vec![
             ("10.0.0.1:8000", up("chat", "default", 10.0, 2), 0.0),
@@ -1829,7 +1875,8 @@ mod tests {
             ModelInfo {
                 id: "lora-a".into(),
                 parent: Some("holo".into()),
-                max_len: Some(32768)
+                max_len: Some(32768),
+                merged: None
             }
         );
         let zev = r#"{"models":[{"name":"kev-latest","kind":"kev"},{"name":"jev-latest"}]}"#;
@@ -1839,6 +1886,13 @@ mod tests {
             .map(|m| m.id)
             .collect();
         assert_eq!(ids, ["kev-latest", "jev-latest"]);
+        let merged = r#"{"models":[{"name":"kev-4b","merged":true},{"name":"kev-8b","merged":false},{"name":"x"}]}"#;
+        let m: Vec<_> = parse_models(merged)
+            .unwrap()
+            .into_iter()
+            .map(|m| m.merged)
+            .collect();
+        assert_eq!(m, [Some(true), Some(false), None]);
         assert!(
             parse_models("zev_in_flight 3").is_none(),
             "not /v1/models: keep the last list"
@@ -1860,6 +1914,7 @@ mod tests {
                     id: id.to_string(),
                     parent: None,
                     max_len: None,
+                    merged: None,
                 })
                 .collect();
             let now = Instant::now();

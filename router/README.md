@@ -27,10 +27,10 @@ screenshot prompt).
    text-only pods (a bare `image_url` in a prompt or schema does not).
 5. **Admission**. With the `affinity_header` (default `x-session-id`), the session's **home** pod (weighted rendezvous
    hash: every replica agrees, losing a pod rehomes only its sessions) if it has a free slot. A full home is waited for
-   up to `affinity_wait_s`, unless another pod with room scores `spill_ratio` times the home. Otherwise a
-   **weighted-random pod with a free slot**, scored `weight / (1 + running + waiting)` from the pod's own
-   `/metrics` (x0.1 over 95% KV cache, x0.5 on a sample older than 15 s, x0.05 for 30 s after a failure; a stalled pod
-   scores 0). `weight` is learned and a free slot is below the adaptive limit (next section). Every pod full: wait for a release (woken by a `Notify`), up to `queue_timeout_s`, then 503. No pod in
+   up to `affinity_wait_s`, unless another pod with room scores `spill_ratio` times the home. Otherwise the
+   **pod with a free slot expected to finish soonest**: the body bytes queued on it plus this request's, over its speed
+   (the learned `weight`; x0.1 over 95% KV cache, x0.5 on a sample older than 15 s, x0.05 for 30 s after a failure; x1/3
+   where a zev pod lists the requested model with `"merged": false`; a stalled pod is skipped), with ±10% jitter. A free slot is below the adaptive limit (next section). Every pod full: wait for a release (woken by a `Notify`), up to `queue_timeout_s`, then 503. No pod in
    the pool: 502 at once.
 6. **Attempts**, up to 3: a connect error, no headers within 600 s, or a **429/500/502/503** goes to an untried pod,
    and the pod is scored down for 30 s. With no untried pod left, the last answer is passed through.
