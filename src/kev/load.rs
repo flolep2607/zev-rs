@@ -284,6 +284,9 @@ fn kev_base(dir: &Path) -> Res<Option<(String, PathBuf)>> {
     Ok(Some((base_spec, base)))
 }
 
+/// `how` of an adapter that runs as a delta on another adapter's merged base (about 3.4x slower per pass).
+const UNMERGED: &str = "unmerged delta on a shared base";
+
 /// Serve Kev backbones (one per device, `--devices` order) with `dir`'s pointer head.
 #[allow(clippy::too_many_arguments)]
 fn kev_served(
@@ -304,7 +307,9 @@ fn kev_served(
     }
     let dtype = format!("{:?}", o.dtype).to_lowercase();
     let card = json!({"description": format!("Kev pointer head on {base_spec} (LoRA {how}), Candle backend, temperature {:.2}", meta.temperature),
-                      "backend": "candle", "dtype": dtype, "temperature": meta.temperature});
+                      "backend": "candle", "dtype": dtype, "temperature": meta.temperature,
+                      // the router prefers pods where a model's adapter is the merged (fast) one
+                      "merged": how != UNMERGED});
     let names = vec!["kev-latest".to_string(), "jev-latest".to_string(), spec.to_string()];
     eprintln!(
         "zev: loaded {spec} ({}) x{} in {:.1}s as {names:?}",
@@ -364,7 +369,7 @@ fn load_specs(specs: &[&str], o: &LoadOpts) -> Res<Vec<Served>> {
                             .iter()
                             .map(|m| m.with_adapter(b, dir, Some(hot)))
                             .collect::<candle_core::Result<Vec<_>>>()?;
-                        out.push(kev_served(spec, dir, base_spec, b, models, "unmerged delta on a shared base", o, t0)?);
+                        out.push(kev_served(spec, dir, base_spec, b, models, UNMERGED, o, t0)?);
                     }
                 }
             }
